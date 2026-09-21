@@ -1,0 +1,20 @@
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+
+# Secrets
+.env
+
+# macOS
+.DS_Store
+
+# 문서 풀 PDF (arXiv에서 내려받음)
+data/papers/*.pdf
+
+# 실행 산출물 (재현 모드용 캐시와 인덱스는 폴더만 유지)
+outputs/*
+!outputs/cache/.gitkeep
+!outputs/index/.gitkeep
