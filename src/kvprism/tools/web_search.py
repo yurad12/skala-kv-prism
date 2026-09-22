@@ -12,6 +12,11 @@ from tavily import TavilyClient
 
 from ..graph.state import Source
 
+
+from dotenv import load_dotenv
+
+load_dotenv(override=True)
+
 DEFAULT_MAX_RESULTS = 5
 CACHE_DIR = Path("outputs/cache")
 CACHE_DIR.mkdir(parents=True, exist_ok=True)
