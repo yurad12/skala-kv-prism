@@ -45,4 +45,9 @@ def domain_node(state: GraphState) -> dict:
         system_prompt=DOMAIN_SYSTEM_PROMPT,
         query_fn=_get_domain_queries,
         use_domain_context=True,
+        research_fields=(
+            "performance_metrics",
+            "experimental_conditions",
+            "limitations",
+        ),
     )
