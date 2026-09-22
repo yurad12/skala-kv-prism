@@ -78,12 +78,15 @@ def evaluate_perspective_node(
     if extra_sources:
         for s in extra_sources:
             sources_by_id[s.source_id] = s
-            
+
     tech_contexts: list[str] = []
 
     for tech in req.technologies:
         research_text = _format_research(state, tech.technology_id, research_fields)
-        tech_source_ids: list[str] = []
+        # 이 기술의 논문 RAG 청크(extra_sources)를 먼저 넣어 LLM 이 인용할 수 있게 한다
+        tech_source_ids: list[str] = [
+            s.source_id for s in (extra_sources or []) if s.doc_id == tech.paper_doc_id
+        ]
         for q in query_fn(tech.name, domain, scenario):
             for s in web_search(query=q, max_results=2):
                 sources_by_id[s.source_id] = s
