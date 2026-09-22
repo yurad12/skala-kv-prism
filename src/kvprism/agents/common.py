@@ -20,7 +20,7 @@ from ..graph.state import (
 )
 from ..tools.web_search import web_search
 
-load_dotenv(override=True)
+load_dotenv()
 
 
 class _RawClaim(BaseModel):
