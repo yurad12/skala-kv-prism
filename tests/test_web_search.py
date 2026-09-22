@@ -40,7 +40,7 @@ def test_cached_source_id_is_normalized_before_return(tmp_path, monkeypatch) -> 
         ),
         encoding="utf-8",
     )
-    monkeypatch.setattr(web_search_module, "_get_cache_path", lambda query: cache_path)
+    monkeypatch.setattr(web_search_module, "_get_cache_path", lambda query, max_results=None: cache_path)
 
     sources = web_search_module.web_search("cached query")
 
