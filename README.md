@@ -43,6 +43,60 @@ KV cache 최적화 기술을 소프트웨어(압축)와 하드웨어(메모리 �
 - Report : markdown-pdf
 - Environment : Python 3.11, uv (`pyproject.toml` + `uv.lock`)
 
+## RAG 아키텍처 및 검색 실측
+
+RAG는 기술 조사(research)와 도메인 평가(domain) 에이전트가 씁니다. 문서 풀은 선정 논문 2편(38쪽)이고, 검색기는 `rag_retrieve(doc_id, query, k)` 하나입니다.
+
+```
+PDF ─PyMuPDF→ 페이지 텍스트 ─800자/겹침 100자→ 청크 ─bge-m3→ Chroma ┐
+                                                  └─BM25(rank_bm25)─┘→ RRF(k=60) → doc_id 필터 → 상위 5개 + [TQ p.7] 태그
+```
+
+- 로딩 : PyMuPDF로 페이지별 텍스트를 뽑고 NFKC 정규화, 줄 끝 하이픈 복원만 합니다. 페이지 번호가 인용 태그가 됩니다
+- 청킹 : 페이지 안에서 800자 단위, 앞뒤 100자 겹침. 청크 id는 `turboquant:p7:2` 형식이고 그대로 `Source.source_id`가 됩니다
+- 인덱스 : bge-m3 임베딩은 Chroma(`outputs/index/chroma`), BM25는 pickle로 저장하고 있으면 다시 만들지 않습니다
+- 검색 : 질의는 영어로 씁니다. dense와 BM25가 각각 상위 10개를 내고 RRF로 융합한 뒤 doc_id로 걸러 상위 5개를 돌려줍니다
+- 인용 : 반환된 `Source`의 `url_or_page`에 `[TQ p.7]` 태그, `excerpt`에 청크 원문을 그대로 담습니다. 검증 노드가 근거 문장 포함 여부를 이 원문에서 확인합니다
+
+**골든 근거 세트로 실측** — 사람이 만든 질문에 정답 근거(정규식)를 붙인 세트로 Hit@K(상위 K 안에 정답 청크가 있는 비율)와 MRR@10을 잽니다. 개발 세트 24문항으로 파서·임베딩·검색 방식을 고르고, 확정 후 검증 세트 12문항으로 한 번 더 확인했습니다. 문항마다 영어·한국어 질의를 하나씩 두었습니다. 설계 단계 벤치마크는 후보 논문 6편(136쪽, 728청크)에서 쟀고, 운영 인덱스(2편)에서도 같은 코드로 다시 쟀습니다. 검색 방식 표와 운영 인덱스 재측정은 `scripts/eval_retrieval.py`가 현재 코드로 다시 계산한 값이고, 파서·임베딩 비교표는 설계 단계 실험값입니다.
+
+파서 비교 (bge-m3 고정, 개발 세트)
+
+| 파서 | 추출 시간 | 숫자 분리 오류 (`45 .29`) | 표 행 보존 | 2단 조판 흐름 | 골든 근거 발견 |
+| --- | --- | --- | --- | --- | --- |
+| **PyMuPDF** | 0.7초 | 0건 | 6/6 | 5/5 | 24/24 |
+| pypdf | 2.5초 | 64건 | 6/6 | 5/5 | 24/24 |
+| pdfminer | 5.4초 | 0건 | 1/6 | 5/5 | 21/24 |
+| pdfplumber | 8.3초 | 3건 | 2/6 | 0/5 | 13/24 |
+
+pypdf는 검색 품질이 같지만 수치를 인용하는 기술 조사에 숫자 분리 보정이 더 필요해 PyMuPDF를 택했습니다.
+
+임베딩 비교 (dense 단독, doc_id 필터 없음, 개발 세트 24문항)
+
+| 모델 | 영어 질의 Hit@5 / MRR | 한국어 질의 Hit@5 / MRR | 크기 · 라이선스 |
+| --- | --- | --- | --- |
+| **BAAI/bge-m3** | 0.833 / 0.648 | 0.833 / 0.692 | 568M · MIT |
+| Qwen3-Embedding-0.6B | 0.750 / 0.618 | 0.667 / 0.527 | 0.6B · Apache-2.0 |
+
+후보는 한국어·영어 지원, 1B 이하, 상업 이용 가능 라이선스로 좁혔고, 리더보드 순위는 기준에서 뺐습니다. 리더보드는 일반 데이터셋 기준이라 이 논문 2편과 질의 조건을 반영하지 않기 때문입니다.
+
+검색 방식 비교 (PyMuPDF · bge-m3 · 벤치마크 6편, 설계서 2.2.2와 같은 조건)
+
+| 검색 방식 | 개발 24문항 Hit@5 / MRR | 검증 12문항 Hit@5 / MRR |
+| --- | --- | --- |
+| dense(영어) | 20/24 (0.833) / 0.648 | 6/12 (0.500) / 0.455 |
+| dense(한국어) | 20/24 (0.833) / 0.692 | 7/12 (0.583) / 0.444 |
+| BM25(영어) | 23/24 (0.958) / 0.703 | 7/12 (0.583) / 0.389 |
+| BM25(한국어) | 11/24 (0.458) / 0.314 | 1/12 (0.083) / 0.056 |
+| **RRF dense(영어)+BM25(영어) — 채택** | **22/24 (0.917) / 0.727** | 8/12 (0.667) / 0.447 |
+| RRF dense(한국어)+BM25(한국어) | 18/24 (0.750) / 0.449 | 5/12 (0.417) / 0.344 |
+
+운영 조건인 기술별 doc_id 필터를 걸면 채택 방식은 개발 세트 22/24 (0.917) / 0.727로 같고, 검증 세트는 **10/12 (0.833) / 0.570**입니다. 두 조건의 전체 표는 [docs/retrieval_eval_benchmark.md](docs/retrieval_eval_benchmark.md)에 있습니다.
+
+문서가 영어 논문이라 한국어 질의는 BM25가 정답을 거의 찾지 못하고, dense와 융합해도 dense 단독보다 떨어집니다. 영어 질의로 dense와 BM25를 융합하면 두 세트 모두에서 MRR이 가장 높아 이 방식을 채택했습니다. 실험의 영어 질의는 사람이 쓴 것이라 LLM이 쓴 질의는 이보다 낮을 수 있고, 그래서 기술 조사 에이전트는 검색 결과의 관련성을 판정해 부족하면 질의를 한 번 고쳐 다시 검색합니다.
+
+운영 인덱스(선정 2편, 해당 논문 문항만) 재측정 — 채택 방식 기준 개발 8문항 6/8 (MRR 0.641), 검증 4문항 4/4 (MRR 0.708). 문항 수가 적어 한 문항이 12.5%p를 움직이므로 참고값입니다. 전체 표는 [docs/retrieval_eval_operational.md](docs/retrieval_eval_operational.md)에 있습니다.
+
 ## Agents
 
 에이전트 7개가 각각 그래프의 노드 하나입니다. 괄호 안은 코드에서 쓰는 노드 이름입니다.
@@ -92,10 +146,12 @@ flowchart TD
 ## Directory Structure
 
 ```
-├── configs/               # 실행 설정 (모델, 검색 파라미터, 선정 기술)
+├── configs/
+│   └── rag.yaml           # 청킹 · 검색 파라미터, 논문 메타데이터(인용 태그, 저자, 발행일)
 ├── data/
 │   ├── papers/            # 문서 풀 PDF (TurboQuant, ITME) — git 제외
-│   └── qa/                # 골든 근거 세트 (검색 평가용)
+│   │   └── eval/          # 검색 벤치마크용 후보 6편 — git 제외
+│   └── qa/                # 골든 근거 세트 dev.json(24) · val.json(12)
 ├── src/kvprism/
 │   ├── rag/               # 로딩 · 청킹 · 인덱싱 · 순위 융합 검색
 │   ├── tools/             # rag_retrieve · web_search · fetch_and_summarize
@@ -103,8 +159,11 @@ flowchart TD
 │   ├── graph/             # State 정의와 그래프 조립
 │   └── prompts/           # 에이전트별 프롬프트
 ├── outputs/
-│   └── index/             # Chroma · BM25 인덱스
-├── scripts/               # 인덱싱 · 검색 평가
+│   └── index/             # Chroma · BM25 인덱스 (첫 실행 때 자동 생성)
+├── scripts/
+│   ├── download_papers.py # arXiv에서 논문 PDF 내려받기
+│   ├── build_index.py     # 인덱스 생성 (--eval: 벤치마크 코퍼스)
+│   └── eval_retrieval.py  # Hit@K · MRR 측정 (--benchmark: 6편 24/12문항)
 ├── tests/
 └── docs/                  # 설계 문서 · 실험 기록
 ```
@@ -114,12 +173,22 @@ flowchart TD
 ```bash
 uv sync --extra dev        # .venv 생성 + uv.lock 기준으로 동일 환경 설치
 cp .env.example .env       # OPENAI_API_KEY, TAVILY_API_KEY, 모델 이름 입력
-uv run python app.py       # 전체 그래프 실행 → PDF 생성
+uv run python scripts/download_papers.py   # 논문 PDF 2편 내려받기 (--all: 벤치마크용 6편까지)
+uv run python app.py       # 전체 그래프 실행 → PDF 생성 (인덱스가 없으면 먼저 만듭니다)
+```
+
+검색 품질만 따로 확인하려면:
+
+```bash
+uv run python scripts/build_index.py                     # outputs/index 생성 (있으면 건너뜀)
+uv run python scripts/eval_retrieval.py                  # 운영 인덱스 2편, 해당 문항 8/4개
+uv run python scripts/eval_retrieval.py --benchmark      # 후보 6편, 개발 24 · 검증 12문항 (설계 문서 조건)
+uv run pytest                                            # 단위 테스트
 ```
 
 ## Contributors
 
-- {이름} : RAG (문서 로딩 · 청킹 · 인덱스, `rag_retrieve`, 기술 조사 에이전트, 검색 평가 스크립트)
+- 이진욱 : RAG (문서 로딩 · 청킹 · 인덱스, `rag_retrieve`, 기술 조사 에이전트, 골든 근거 세트 · 파서 · 임베딩 · 검색 방식 실측, 검색 평가 스크립트)
 - {이름} : 웹 도구와 관점 평가 (`web_search`, `fetch_and_summarize`, 시장 · 이해관계자 · 도메인 에이전트와 프롬프트)
 - {이름} : State · 그래프 · 검증 (State 정의, 그래프 조립, 검증 에이전트, 실행 스크립트)
 - {이름} : 종합 · 보고서 (평가 종합 · 보고서 생성 에이전트, 금지 표현 규칙, REFERENCE, PDF 변환)
