@@ -6,6 +6,7 @@
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from typing import Callable
 
@@ -13,6 +14,9 @@ from langgraph.graph import END, START, StateGraph
 from langgraph.graph.state import CompiledStateGraph
 
 from .state import GraphState, Perspective
+
+
+log = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
@@ -72,6 +76,10 @@ def route_after_judge(state: GraphState) -> str:
         return SYNTHESIZE
     if state.get("retry_count", 0) == 0:
         return PREPARE_RETRY
+    log.warning(
+        "관점별 평가를 한 번 재실행했지만 검증 미달이 남아 종합 단계로 진행합니다: %s",
+        "; ".join(judge.warnings),
+    )
     return SYNTHESIZE
 
 
