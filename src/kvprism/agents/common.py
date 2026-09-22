@@ -5,7 +5,7 @@ from __future__ import annotations
 import os
 from typing import Callable
 from dotenv import load_dotenv
-from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_openai import ChatOpenAI
 from pydantic import BaseModel, Field
 
@@ -87,16 +87,21 @@ def evaluate_perspective_node(
             f"참조 출처:\n{sources_text if sources_text else '(수집된 웹 출처 없음)'}"
         )
 
-    # 3. LLM 프롬프트 호출
+    # 3. LLM 메세지 조립
     domain_header = f"도메인: {domain}\n시나리오: {scenario}\n\n" if use_domain_context else ""
-    prompt = ChatPromptTemplate.from_messages([
-        ("system", system_prompt),
-        ("human", f"{domain_header}{chr(10).join(tech_contexts)}{retry_note}\n\n위 2개 기술({[t.technology_id for t in req.technologies]}) 각각의 평가를 작성하세요."),
-    ])
+    user_content = (
+        f"{domain_header}{chr(10).join(tech_contexts)}{retry_note}\n\n"
+        f"위 2개 기술({[t.technology_id for t in req.technologies]}) 각각의 평가를 작성하세요."
+    )
+
+    messages = [
+        SystemMessage(content=system_prompt),
+        HumanMessage(content=user_content),
+    ]
 
     model_name = os.getenv("OPENAI_MODEL_NAME") or os.getenv("GENERATOR_MODEL") or "gpt-4o-mini"
     llm = ChatOpenAI(model=model_name, temperature=0).with_structured_output(_RawPerspectiveResult)
-    raw: _RawPerspectiveResult = (prompt | llm).invoke({})
+    raw: _RawPerspectiveResult = llm.invoke(messages)
 
     # 4. StrictModel 규격 변환 및 stance 검증 통과 보장
     target_ids = {t.technology_id for t in req.technologies}
