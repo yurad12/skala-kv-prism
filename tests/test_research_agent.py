@@ -2,6 +2,7 @@
 
 from kvprism.agents.research import (
     RelevanceVerdict,
+    SearchQueries,
     collect_sources,
     extract_profile,
     research_node,
@@ -44,6 +45,8 @@ class FakeAsk:
         self.relevance_calls = 0
 
     def __call__(self, schema, system, user):
+        if schema is SearchQueries:  # 항목 5개 × 2개 = 영어 질의 10개
+            return SearchQueries(queries=[f"query {i}" for i in range(10)])
         if schema is RelevanceVerdict:
             self.relevance_calls += 1
             if "성능 수치" in user:
@@ -129,7 +132,9 @@ def test_collect_sources_skips_llm_when_nothing_retrieved():
 
     def ask(schema, system, user):
         calls.append(schema)
+        if schema is SearchQueries:
+            return SearchQueries(queries=[f"q{i}" for i in range(10)])
         return RelevanceVerdict(sufficient=True)
 
     assert collect_sources(make_techs()[0], lambda d, q, k: [], ask) == {}
-    assert calls == []
+    assert calls == [SearchQueries]  # 질의 생성 1회뿐, 관련성 판정은 부르지 않음

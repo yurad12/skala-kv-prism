@@ -3,27 +3,7 @@
 검색 질의는 영어(문서가 영어 논문), 산출물은 한국어. 근거 청크가 없는 수치는 쓰지 않는다.
 """
 
-# 기술별로 반드시 채워야 하는 조사 항목과 영어 검색 질의. {name} 은 기술 이름으로 치환한다.
-ASPECT_QUERIES: dict[str, list[str]] = {
-    "mechanism": [
-        "What is {name} and what is the core idea of the method?",
-        "How does {name} work step by step: algorithm, data flow, or system architecture",
-    ],
-    "performance_metrics": [
-        "{name} main results: memory reduction, compression ratio, throughput, latency, speedup, accuracy",
-        "quantitative evaluation of {name} compared to baselines",
-    ],
-    "experimental_conditions": [
-        "experimental setup for {name}: models, hardware, GPUs, datasets, benchmarks, baselines, sequence lengths",
-    ],
-    "limitations": [
-        "limitations, overhead, assumptions, or future work discussed by the authors of {name}",
-    ],
-    "trl_signals": [
-        "implementation of {name}: prototype, FPGA, simulator, real hardware, open-source code, integration into serving frameworks",
-    ],
-}
-
+# 기술별로 반드시 채워야 하는 조사 항목 (한국어). 검색 질의는 LLM 이 이 항목을 보고 영어로 쓴다 (설계서 2.2.2)
 ASPECT_QUESTIONS_KO: dict[str, str] = {
     "mechanism": "핵심 아이디어와 동작 방식",
     "performance_metrics": "성능 수치(메모리 절감, 압축률, 처리량, 지연, 정확도)",
@@ -31,6 +11,18 @@ ASPECT_QUESTIONS_KO: dict[str, str] = {
     "limitations": "저자가 밝힌 한계, 오버헤드, 전제",
     "trl_signals": "구현 형태(프로토타입/FPGA/시뮬레이터/실장비/공개 코드/프레임워크 통합)와 검증 환경",
 }
+
+QUERY_SYSTEM = """You write search queries for retrieving passages from an English research paper.
+The paper is in English, so every query MUST be in English. Use terminology likely to appear in the paper
+(method names, metric names, hardware names, section titles). One line per query, no numbering, no explanation."""
+
+QUERY_USER = """Paper: {title}
+Technology: {name}
+
+For each of the following research items (written in Korean), write 2 English search queries.
+Return them in the same order, 2 per item, as a flat list of {n} queries.
+
+{items}"""
 
 RELEVANCE_SYSTEM = """You judge whether retrieved passages from a research paper are sufficient to answer a question.
 Answer strictly from the passages. Do not use outside knowledge."""
