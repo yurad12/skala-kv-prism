@@ -60,6 +60,7 @@ def build_references(sources: Sequence[Source]) -> str:
     papers = _paper_docs()
     lines = ["# REFERENCE", ""]
     listed_docs: set[str] = set()
+    listed_urls: set[str] = set()
     for source in sources:
         if source.source_kind == "paper":
             # 청크가 달라도 같은 논문이면 한 줄. 페이지는 본문 인용 태그가 가리킨다
@@ -67,10 +68,14 @@ def build_references(sources: Sequence[Source]) -> str:
                 continue
             listed_docs.add(source.doc_id or "")
             lines.append(_paper_line(source, papers.get(source.doc_id or "", {})))
+        elif source.url_or_page in listed_urls:
+            continue
         elif any(host in source.url_or_page for host in PATENT_HOSTS):
             lines.append(_patent_line(source))
         else:
             lines.append(_web_line(source))
+        if source.source_kind != "paper":
+            listed_urls.add(source.url_or_page)
     return "\n".join(lines)
 
 
@@ -88,7 +93,9 @@ def _paper_line(source: Source, meta: dict) -> str:
     year = str(meta.get("published") or source.published_at or "")[:4] or "연도 미상"
     title = _plain(meta.get("title") or source.title)
     tail = f" *arXiv*, {meta['arxiv']}." if meta.get("arxiv") else f" {source.url_or_page}"
-    return f"- [{source.source_id}] {author} ({year}). {title}.{tail}"
+    # 본문 페이지 태그([TQ p.7])와 같은 약칭([TQ])으로 표기
+    label = re.sub(r"\s*p\.\d+.*$", "", source.url_or_page.strip("[]")) or source.source_id
+    return f"- [{label}] {author} ({year}). {title}.{tail}"
 
 
 def _web_line(source: Source) -> str:
