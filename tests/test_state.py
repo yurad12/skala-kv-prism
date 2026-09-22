@@ -142,6 +142,42 @@ class StateContractTests(unittest.TestCase):
         self.assertFalse(result.passed)
         self.assertEqual(result.failed_perspectives, ["stakeholder"])
 
+    def test_judge_exposes_failed_issues_as_warnings(self) -> None:
+        result = JudgeResult(
+            judgments=[
+                PerspectiveJudgment(
+                    perspective="market",
+                    passed=True,
+                    checks=passing_checks(),
+                ),
+                PerspectiveJudgment(
+                    perspective="stakeholder",
+                    passed=False,
+                    checks=JudgeChecks(
+                        evidence_balance_ok=False,
+                        citations_ok=True,
+                        trl_basis_ok=True,
+                    ),
+                    issues=["긍정 근거가 부족합니다", "부정 근거가 부족합니다"],
+                    retry_instruction="양쪽 근거를 보완하세요.",
+                ),
+                PerspectiveJudgment(
+                    perspective="domain",
+                    passed=True,
+                    checks=passing_checks(),
+                ),
+            ]
+        )
+
+        self.assertEqual(
+            result.warnings,
+            [
+                "stakeholder: 긍정 근거가 부족합니다",
+                "stakeholder: 부정 근거가 부족합니다",
+            ],
+        )
+        self.assertNotIn("warnings", result.model_dump())
+
     def test_graph_state_has_eleven_keys_and_top_level_source_reducer(self) -> None:
         hints = get_type_hints(GraphState, include_extras=True)
         self.assertEqual(len(hints), 11)
