@@ -163,20 +163,35 @@ def replace_external_calls(monkeypatch):
         technology_id = "turboquant" if "TurboQuant" in query else "itme"
         return [make_web_source(technology_id)]
 
+    def fake_rag_retrieve(doc_id: str, query: str, k: int | None = None):
+        return [
+            Source(
+                source_id=f"rag-{doc_id}",
+                source_kind="paper",
+                title=f"{doc_id} 논문",
+                author_or_org="연구팀",
+                url_or_page="[TQ p.9]",
+                excerpt=f"{doc_id} paper experimental setup excerpt",
+                doc_id=doc_id,
+            )
+        ]
+
     monkeypatch.setattr("kvprism.agents.common.web_search", fake_web_search)
     monkeypatch.setattr("kvprism.agents.common.ChatOpenAI", FakeChatOpenAI)
+    monkeypatch.setattr("kvprism.agents.domain.rag_retrieve", fake_rag_retrieve)
 
 
 @pytest.mark.parametrize(
-    ("node", "result_key", "perspective"),
+    ("node", "result_key", "perspective", "extra_source_ids"),
     [
-        (market_node, "market_eval", "market"),
-        (stakeholder_node, "stakeholder_eval", "stakeholder"),
-        (domain_node, "domain_eval", "domain"),
+        (market_node, "market_eval", "market", set()),
+        (stakeholder_node, "stakeholder_eval", "stakeholder", set()),
+        # 도메인 노드는 논문 RAG 청크(설계서 2.1)도 출처로 등록한다
+        (domain_node, "domain_eval", "domain", {"rag-turboquant", "rag-itme"}),
     ],
 )
-def test_perspective_node_returns_only_its_result_and_new_web_sources(
-    graph_state, node, result_key, perspective
+def test_perspective_node_returns_only_its_result_and_new_sources(
+    graph_state, node, result_key, perspective, extra_source_ids
 ) -> None:
     output = node(graph_state)
 
@@ -186,7 +201,27 @@ def test_perspective_node_returns_only_its_result_and_new_web_sources(
     assert {source.source_id for source in output["sources"]} == {
         "web-turboquant",
         "web-itme",
+        *extra_source_ids,
     }
+
+
+def test_domain_node_retrieves_paper_chunks_for_request_technologies(graph_state, monkeypatch) -> None:
+    """도메인 노드는 request.technologies 의 paper_doc_id 로 rag_retrieve 를 부르고 그 발췌문을 프롬프트에 넣는다."""
+
+    calls: list[str] = []
+
+    def spy_rag_retrieve(doc_id: str, query: str, k: int | None = None):
+        calls.append(doc_id)
+        return [
+            Source(source_id=f"rag-{doc_id}", source_kind="paper", title="논문", author_or_org="연구팀",
+                   url_or_page="[TQ p.9]", excerpt=f"{doc_id} rag excerpt", doc_id=doc_id)
+        ]
+
+    monkeypatch.setattr("kvprism.agents.domain.rag_retrieve", spy_rag_retrieve)
+    domain_node(graph_state)
+
+    assert set(calls) == {"turboquant", "itme"}
+    assert "turboquant rag excerpt" in FakeChatOpenAI.prompts[-1]
 
 
 def test_perspective_nodes_use_required_research_context(graph_state) -> None:
