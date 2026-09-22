@@ -41,4 +41,5 @@ def stakeholder_node(state: GraphState) -> dict:
         system_prompt=STAKEHOLDER_SYSTEM_PROMPT,
         query_fn=_get_stakeholder_queries,
         use_domain_context=False,
+        research_fields=("overview", "limitations"),
     )
