@@ -29,8 +29,10 @@ dependencies = [
     "langchain-huggingface>=1.2.2",
 ]
 
-[project.optional-dependencies]
-dev = ["pytest>=8.0"]
+[dependency-groups]
+dev = [
+    "pytest>=8.0",
+]
 
 [build-system]
 requires = ["hatchling"]
