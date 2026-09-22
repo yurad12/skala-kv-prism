@@ -183,12 +183,13 @@ uv run python app.py       # 전체 그래프 실행 → PDF 생성 (인덱스�
 uv run python scripts/build_index.py                     # outputs/index 생성 (있으면 건너뜀)
 uv run python scripts/eval_retrieval.py                  # 운영 인덱스 2편, 해당 문항 8/4개
 uv run python scripts/eval_retrieval.py --benchmark      # 후보 6편, 개발 24 · 검증 12문항 (설계 문서 조건)
+uv run pytest tests/test_agents.py -v -s                 # 관점 평가 노드 스키마 및 실행 검증
 uv run pytest                                            # 단위 테스트
 ```
 
 ## Contributors
 
 - 이진욱 : RAG (문서 로딩 · 청킹 · 인덱스, `rag_retrieve`, 기술 조사 에이전트, 골든 근거 세트 · 파서 · 임베딩 · 검색 방식 실측, 검색 평가 스크립트)
-- {이름} : 웹 도구와 관점 평가 (`web_search`, `fetch_and_summarize`, 시장 · 이해관계자 · 도메인 에이전트와 프롬프트)
-- {이름} : State · 그래프 · 검증 (State 정의, 그래프 조립, 검증 에이전트, 실행 스크립트)
-- {이름} : 종합 · 보고서 (평가 종합 · 보고서 생성 에이전트, 금지 표현 규칙, REFERENCE, PDF 변환)
+- 이민경 : 웹 도구와 관점 평가 (`web_search`, `fetch_and_summarize`, 시장 · 이해관계자 · 도메인 에이전트와 프롬프트)
+- 정유정 : State · 그래프 · 검증 (State 정의, 그래프 조립, 검증 에이전트, 실행 스크립트)
+- 오승민 : 종합 · 보고서 (평가 종합 · 보고서 생성 에이전트, 금지 표현 규칙, REFERENCE, PDF 변환)
