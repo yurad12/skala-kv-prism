@@ -7,7 +7,14 @@ from collections import Counter
 from collections.abc import Iterable
 from unittest.mock import patch
 
-from kvprism.graph.build import GraphNodes, build_graph
+from kvprism.agents.domain import domain_node
+from kvprism.agents.judge import judge_node
+from kvprism.agents.market import market_node
+from kvprism.agents.report import report_node
+from kvprism.agents.research import research_node
+from kvprism.agents.stakeholder import stakeholder_node
+from kvprism.agents.synthesize import synthesize_node
+from kvprism.graph.build import GraphNodes, actual_graph_nodes, build_graph
 from kvprism.graph.state import (
     GraphState,
     JudgeChecks,
@@ -92,6 +99,33 @@ def initial_test_state() -> GraphState:
 
 
 class GraphBuildTests(unittest.TestCase):
+    def test_actual_graph_nodes_connects_all_implemented_functions(self) -> None:
+        nodes = actual_graph_nodes()
+
+        self.assertIs(nodes.research, research_node)
+        self.assertIs(nodes.market, market_node)
+        self.assertIs(nodes.stakeholder, stakeholder_node)
+        self.assertIs(nodes.domain, domain_node)
+        self.assertIs(nodes.judge, judge_node)
+        self.assertIs(nodes.synthesize, synthesize_node)
+        self.assertIs(nodes.report, report_node)
+
+    def test_default_graph_has_required_actual_node_topology(self) -> None:
+        graph = build_graph().get_graph()
+        edges = {
+            (edge.source, edge.target, edge.conditional) for edge in graph.edges
+        }
+
+        self.assertIn(("__start__", "research", False), edges)
+        for perspective in PERSPECTIVES:
+            self.assertIn(("research", perspective, False), edges)
+            self.assertIn((perspective, "judge", False), edges)
+            self.assertIn(("prepare_retry", perspective, True), edges)
+        self.assertIn(("judge", "prepare_retry", True), edges)
+        self.assertIn(("judge", "synthesize", True), edges)
+        self.assertIn(("synthesize", "report", False), edges)
+        self.assertIn(("report", "__end__", False), edges)
+
     def test_all_perspectives_run_in_parallel_then_judge_runs_once(self) -> None:
         graph, calls = make_test_graph([set()])
 

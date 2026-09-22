@@ -1,0 +1,16 @@
+# 전체 LangGraph 실행 입력
+domain: 데이터센터
+scenario: 장문맥 멀티테넌트 LLM 추론
+replay: false
+
+technologies:
+  - technology_id: turboquant
+    name: TurboQuant
+    kind: software
+    paper_doc_id: turboquant
+    paper_title: "TurboQuant: Online Vector Quantization with Near-optimal Distortion Rate"
+  - technology_id: itme
+    name: ITME
+    kind: hardware
+    paper_doc_id: itme
+    paper_title: "ITME: Inference Tiered Memory Expansion with Disaggregated CXL-Hybrid Memories"

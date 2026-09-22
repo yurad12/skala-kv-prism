@@ -61,6 +61,29 @@ class GraphNodes:
     report: NodeFunction
 
 
+def actual_graph_nodes() -> GraphNodes:
+    """현재 패키지에 구현된 실제 에이전트 함수 일곱 개를 반환한다."""
+
+    # 모듈을 불러올 때 외부 도구 의존성까지 로딩하지 않도록 조립 시점에 가져온다.
+    from ..agents.domain import domain_node
+    from ..agents.judge import judge_node
+    from ..agents.market import market_node
+    from ..agents.report import report_node
+    from ..agents.research import research_node
+    from ..agents.stakeholder import stakeholder_node
+    from ..agents.synthesize import synthesize_node
+
+    return GraphNodes(
+        research=research_node,
+        market=market_node,
+        stakeholder=stakeholder_node,
+        domain=domain_node,
+        judge=judge_node,
+        synthesize=synthesize_node,
+        report=report_node,
+    )
+
+
 # ---------------------------------------------------------------------------
 # 재실행 제어
 # ---------------------------------------------------------------------------
@@ -108,8 +131,10 @@ def route_retry_targets(state: GraphState) -> list[str]:
 # ---------------------------------------------------------------------------
 
 
-def build_graph(nodes: GraphNodes) -> CompiledStateGraph:
-    """설계서의 fan-out, fan-in, 1회 재실행 구조를 컴파일한다."""
+def build_graph(nodes: GraphNodes | None = None) -> CompiledStateGraph:
+    """실제 노드 또는 주입된 노드로 설계서의 실행 구조를 컴파일한다."""
+
+    nodes = nodes or actual_graph_nodes()
 
     graph = StateGraph(GraphState)
 

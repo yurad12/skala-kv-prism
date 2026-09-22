@@ -62,4 +62,9 @@ def domain_node(state: GraphState) -> dict:
         query_fn=_get_domain_queries,
         extra_sources=rag_sources,
         use_domain_context=True,
+        research_fields=(
+            "performance_metrics",
+            "experimental_conditions",
+            "limitations",
+        ),
     )

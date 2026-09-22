@@ -44,4 +44,5 @@ def market_node(state: GraphState) -> dict:
         system_prompt=MARKET_SYSTEM_PROMPT,
         query_fn=_get_market_queries,
         use_domain_context=False,
+        research_fields=("overview", "limitations", "trl_signals"),
     )
