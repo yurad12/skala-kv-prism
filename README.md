@@ -7,75 +7,87 @@ KV cache 최적화 기술을 소프트웨어(압축)와 하드웨어(메모리 �
 ## Overview
 
 - Objective : 하나의 기술을 복수 관점에서 비교 평가하고, 관점 간 상충 지점을 드러내는 보고서 생성
-- Method : Multi-Agent (LangGraph, 병렬 fan-out + 검증 루프) + Agentic RAG (논문 원문 검색)
-- Domain : 데이터센터 · 클라우드 LLM 서빙 (128K 이상 장문맥 요청이 섞인 멀티테넌트 시나리오)
+- Method : Multi-Agent (LangGraph, 관점 3개 병렬 실행 + 검증 1회) + Agentic RAG (논문 원문 검색)
+- Domain : 데이터센터 · 클라우드 LLM 서빙 (장문맥 요청이 섞인 멀티테넌트 시나리오)
 - Tools : 논문 RAG 검색(`rag_retrieve`), 웹 검색(`web_search`), URL 요약(`fetch_and_summarize`)
 
 ## Selected Technologies
 
 | 진영 | 기술 | 출처 | 선정 이유 |
 | --- | --- | --- | --- |
-| SW | **TurboQuant** | Zandieh et al., arXiv 2504.19874 (ICLR 2026) | 재학습 없이 KV cache를 3~4비트로 줄이는 사후 압축의 가장 순수한 형태. 2026-03 공개 직후 메모리 업계 주가 반응, 애널리스트 반박, vLLM 병합이 3주 안에 이어져 관점별 자료가 가장 풍부하고 서로 엇갈림 |
-| HW | **ITME** | SK hynix Memory Systems Research, arXiv 2606.12556 | CXL-Hybrid 메모리 계층으로 KV cache를 옮기는 최신 사례. TurboQuant로 주가가 흔들린 메모리 제조사가 낸 답변이라 두 논문이 한 사건의 양면이 됨. 논문 TRL과 기반 CXL 모듈 TRL이 갈려 "발표와 채택의 시차" 서술에 적합 |
+| SW | **TurboQuant** | Zandieh et al., arXiv 2504.19874 | 모델 구조는 그대로 두고 KV cache의 숫자 표현만 채널당 3.5비트로 줄인다. 재학습과 보정이 필요 없어 SW 진영의 접근을 그대로 보여준다. 공개 구현, vLLM 통합, 발표 직후의 메모리 업계 반응까지 네 관점 자료가 모두 있다 |
+| HW | **ITME** | Jang et al., arXiv 2606.12556 | KV cache를 HBM 밖 CXL-Hybrid 메모리 계층으로 옮긴다. 정확도 손실은 없지만 새 메모리 장치가 필요해 TurboQuant와 반대 방향의 맞바꿈이 된다. 논문은 FPGA 프로토타입 단계이고 기반 CXL 모듈은 제품과 양산 발표가 있어, 논문 성숙도와 기반 기술 성숙도의 차이를 볼 수 있다 |
 
-문서 풀은 두 논문 38페이지(한도 200페이지)입니다. 선정 기준표와 후보 6편 채점은 설계 문서에 있습니다.
+문서 풀은 두 논문 38페이지(한도 200페이지)입니다. 선정 기준표와 후보 6건 채점은 설계 문서에 있습니다.
 
 ## Features
 
-- 논문 원문 기반 정보 추출 : PyMuPDF로 추출한 텍스트를 섹션 인지 청킹(800토큰, 겹침 100)하고, 검색 결과에 `[TQ p.7]` 형식의 인용 태그를 붙여 REFERENCE까지 추적
-- 언어 라우팅 검색 : 한국어 질의는 bge-m3 dense, 영어 질의는 BM25로 검색. 점수 결합형 하이브리드는 한국어 질의 성능을 떨어뜨려 채택하지 않음
-- 웹 검색 · 요약 도구 : 시장 · 이해관계자 근거를 기관명 · 날짜 · URL과 함께 소스 레지스트리에 기록
-- 관점별 병렬 평가 : 시장 · 이해관계자 · 도메인 에이전트가 분리된 State 키에 결과를 기록
-- TRL 추정 : 논문 TRL과 기반 기술 TRL을 분리하고 "공개 정보 기반 추정" 문구를 항상 붙임
-- 확증 편향 방지 전략 : (1) 기술별 긍정 · 부정 근거 각 1건 이상 강제 (2) 생성 모델과 판정 모델 분리 (3) 단일 출처 의존 결론에 "출처 다양성 부족" 표시. 검증 에이전트가 양면 근거와 인용 누락을 검사해 최대 1회 보완 요청
-- 재현 모드 : 검색 · LLM 응답을 캐시해 API 키 없이 같은 보고서를 재생성 (`--replay`)
+- 논문 원문 기반 정보 추출 : PyMuPDF로 본문과 표를 추출하고 800자 단위(앞뒤 100자 겹침)로 청킹합니다. 검색 결과에 `[TQ p.7]` 형식의 태그를 붙여 REFERENCE까지 추적합니다
+- 영어 질의 + 순위 융합 검색 : dense(bge-m3)와 BM25의 검색 순위를 융합하고 기술별 doc_id로 걸러 상위 5개를 돌려줍니다. 문서가 영어 논문이라 한국어 질의는 BM25가 정답을 거의 찾지 못해, 검색 질의는 영어로 고정합니다
+- 검색 재질의 : 기술 조사 에이전트가 검색 결과로 질문에 답할 수 있는지 판정하고, 부족하면 질의를 한 번 고쳐 다시 검색합니다
+- 관점별 병렬 평가 : 시장 · 이해관계자 · 도메인 에이전트가 분리된 State 키에 결과를 기록합니다
+- 원문 발췌 보관 : 도구가 가져온 원문 일부를 요약 없이 Source의 excerpt에 남기고, 근거 문장은 excerpt에서 그대로 옮긴 문장만 사용합니다
+- 확증 편향 방지 : 기술별로 긍정 · 부정 근거를 각 1건 이상 두고, 생성 모델과 판정 모델을 분리하며, 단일 출처에만 기댄 결론에는 표시를 남깁니다
+- 검증 : 근거 균형, 인용 포함 여부, 출처 다양성, 금지 표현은 코드로 검사하고, 근거가 주장을 뒷받침하는지는 Judge LLM이 판정합니다. 미달 관점만 최대 1회 다시 실행합니다
+- TRL 추정 : 논문 TRL과 기반 기술 TRL을 나누어 추정하고, 근거 source_id와 "공개 정보 기반 추정" 문구를 함께 기록합니다
 
 ## Tech Stack
 
 - Framework : LangGraph
-- LLM/Generator : {GPT version}
-- LLM/Judge : {GPT version, Generator와 분리}
-- Retrieval : Chroma (dense) + rank_bm25 (영어 질의) - Hit Rate@5 0.917, MRR 0.689 (골든 근거 24문항, 언어 라우팅 기준)
-- Embedding : BAAI/bge-m3 (MIT, 최대 입력 8,192토큰). 한국어 질의 Hit@5 0.875 / MRR 0.680으로 Qwen3-Embedding-0.6B(0.667 / 0.507) 대비 우세
-- PDF Parser : PyMuPDF (숫자 분리 오류 0건, 표 · 2단 조판 보존 만점, 추출 0.7초)
+- LLM/Generator : gpt-5.6-terra (조사 · 관점 평가는 reasoning effort low, 종합 · 보고서 생성은 medium). 개발 중에는 비용을 줄이려고 gpt-5.6-luna로 실행
+- LLM/Judge : gpt-5.6-luna (reasoning effort none, temperature 0). 자기 검증 편향을 줄이려고 Generator와 분리
+- Retrieval : Chroma(dense) + rank_bm25 순위 융합, 영어 질의 - 개발 세트 Hit@5 0.917 / MRR 0.727, 검증 세트 Hit@5 10/12
+- Embedding : BAAI/bge-m3 (568M, MIT, 최대 입력 8,192토큰). dense 단독 Hit@5 0.833 / MRR 0.670으로 Qwen3-Embedding-0.6B(0.708 / 0.572)보다 앞섬
+- PDF Parser : PyMuPDF (숫자 분리 오류 0건, 표 6/6과 2단 조판 5/5 보존, 추출 0.7초)
 - Web Search : Tavily
+- Report : markdown-pdf
 - Environment : Python 3.11, uv (`pyproject.toml` + `uv.lock`)
 
 ## Agents
 
-- 🔍 기술 조사 (RAG) : 논문에서 개요 · 메커니즘 · 주장 성능 · 실험 조건 · 저자 명시 한계를 추출하고 TRL용 논문 신호를 기록
-- 📊 시장 평가 (웹) : 상용화 · 채택, 생태계 지지를 등급화하고 TRL용 채택 신호(코드 · 프레임워크 통합 · 제품)를 기록
-- 🤝 이해관계자 평가 (웹) : 투자 업계와 경쟁 진영(메모리 벤더)의 입장을 긍정 · 부정 · 유보로 병기
-- 🏭 도메인 평가 (RAG + 웹) : 서빙 시나리오 3항목(처리량 · 비용, 정확도 리스크, 인프라 전제) 적합성
-- 🧐 검증 (Judge) : 양면 근거 유무와 인용 유무 검사, 통과 또는 보완 지시(최대 1회)
-- ⚖️ 평가 종합 : TRL 추정, 관점 × 기술 매트릭스, 상충 지점 2개 도출, 중립 요약
-- 📝 보고서 생성 : 목차별 작성, SUMMARY 반 페이지 제한, 인용 id로 REFERENCE 생성, Markdown → PDF
+에이전트 7개가 각각 그래프의 노드 하나입니다. 괄호 안은 코드에서 쓰는 노드 이름입니다.
+
+- 기술 조사 (research) : 논문 2편에서 핵심 아이디어, 동작 방식, 성능 수치와 실험 조건, 저자가 밝힌 한계를 추출하고 TRL용 논문 신호를 기록합니다. 근거 청크가 없는 수치는 쓰지 않습니다
+- 시장 평가 (market) : 상용화 · 채택 사례와 생태계 지지를 조사하고 TRL용 채택 신호(공개 코드, 프레임워크 통합, 제품 출시)를 기록합니다
+- 이해관계자 평가 (stakeholder) : 투자 업계와 경쟁 진영의 입장을 긍정 · 부정 · 유보로 나누어 출처와 함께 기록합니다
+- 도메인 평가 (domain) : 서빙 시나리오 3항목(처리량 · 비용, 정확도 리스크, 인프라 전제) 적합성을 논문 실험 조건과 대조해 평가합니다
+- 검증 (judge) : 관점 3개의 결과를 한 번에 검사하고, 미달 관점에 보완 지시를 남깁니다. 보완은 1회까지입니다
+- 평가 종합 (synthesize) : TRL을 추정하고 관점 × 기술 매트릭스와 상충 지점 2개 이상을 정리합니다
+- 보고서 생성 (report) : 장별로 본문을 만들고, 인용 태그를 모아 REFERENCE를 만든 뒤 PDF로 변환합니다
 
 ## Architecture
 
 ```mermaid
 flowchart TD
-    IN[/입력: 선정 기술 2건, 도메인/] --> TR["🔍 기술 조사<br>RAG · 논문 2건"]
-    TR --> MK["📊 시장 평가<br>웹 검색"]
-    TR --> ST["🤝 이해관계자 평가<br>웹 검색"]
-    TR --> DM["🏭 도메인 평가<br>RAG + 웹"]
-    MK --> JM{🧐 검증}
-    ST --> JS{🧐 검증}
-    DM --> JD{🧐 검증}
-    JM -- "보완 요청 (최대 1회)" --> MK
-    JS -- "보완 요청 (최대 1회)" --> ST
-    JD -- "보완 요청 (최대 1회)" --> DM
-    JM -- 통과 --> SY["⚖️ 평가 종합<br>TRL 추정 · 상충 도출"]
-    JS -- 통과 --> SY
-    JD -- 통과 --> SY
-    SY --> RP["📝 보고서 생성<br>SUMMARY · REFERENCE"]
-    RP --> OUT[/RAG-Output.pdf/]
+    IN[/입력: 선정 기술 2건, 도메인/]
+    TR["기술 조사<br>(RAG, 논문 2편)"]
+    MK["시장 평가<br>(웹 검색)"]
+    ST["이해관계자 평가<br>(웹 검색)"]
+    DM["도메인 평가<br>(RAG + 웹 검색)"]
+    JG{"검증 (Judge)"}
+    SY["평가 종합<br>(TRL 추정, 상충 도출)"]
+    RP["보고서 생성<br>(SUMMARY, REFERENCE)"]
+    OUT[/RAG-Output.pdf/]
+
+    IN --> TR
+    TR --> MK
+    TR --> ST
+    TR --> DM
+    MK --> JG
+    ST --> JG
+    DM --> JG
+    JG -- "모두 통과" --> SY
+    JG -. "미달 관점만 다시 실행 (최대 1회)" .-> MK & ST & DM
+    TR -. "관련성 미달 시 재질의 (1회)" .-> TR
+    SY --> RP
+    RP --> OUT
 ```
 
-- Workflow : 기술 조사 → 관점 평가 → 종합 → 보고서
-- Fan-out / Join : 세 관점을 병렬 실행하고 분리된 State 키(`market_eval`, `stakeholder_eval`, `domain_eval`)에 기록
-- Loop : 관점 서브그래프 안에서 평가 → 검증 → 보완, 최대 1회
-- Branch : 검증 결과에 따른 조건부 엣지 (통과 / 보완 / 재시도 소진)
+- Workflow : 기술 조사 → 관점 평가 → 검증 → 종합 → 보고서
+- Fan-out / Fan-in : 관점 3개가 병렬로 실행되고, 셋이 모두 끝나면 검증이 한 번 실행됩니다
+- Branch : 검증 결과가 모두 통과이면 종합으로, 미달 관점이 있으면 그 관점만 다시 실행합니다
+- Loop : 보완은 최대 1회이며 retry_count로 횟수를 셉니다. 기술 조사의 재질의는 노드 안에서 처리합니다
+- State : 키 11개를 공유하고, 여러 에이전트가 함께 쓰는 sources만 목록으로 이어 붙입니다. 나머지 키는 새 값으로 덮어씁니다
 
 ## Directory Structure
 
@@ -85,35 +97,29 @@ flowchart TD
 │   ├── papers/            # 문서 풀 PDF (TurboQuant, ITME) — git 제외
 │   └── qa/                # 골든 근거 세트 (검색 평가용)
 ├── src/kvprism/
-│   ├── rag/               # 로딩 · 청킹 · 인덱싱 · 언어 라우팅 검색
-│   ├── tools/             # web_search, fetch_and_summarize, rag_retrieve, 소스 레지스트리
-│   ├── agents/            # 기술 조사 · 시장 · 이해관계자 · 도메인 · 검증 · 종합 · 보고서
-│   ├── graph/             # State 스키마, 관점 서브그래프, 메인 그래프
-│   └── prompts/           # 에이전트별 프롬프트 템플릿
+│   ├── rag/               # 로딩 · 청킹 · 인덱싱 · 순위 융합 검색
+│   ├── tools/             # rag_retrieve · web_search · fetch_and_summarize
+│   ├── agents/            # 에이전트 7개
+│   ├── graph/             # State 정의와 그래프 조립
+│   └── prompts/           # 에이전트별 프롬프트
 ├── outputs/
-│   ├── cache/             # 검색 · LLM 응답 캐시 (재현 모드용)
 │   └── index/             # Chroma · BM25 인덱스
-├── scripts/               # 인덱싱, 검색 평가, 재현 스크립트
+├── scripts/               # 인덱싱 · 검색 평가
 ├── tests/
-├── docs/                  # 설계 문서, 실험 기록
-├── app.py                 # 실행 스크립트
-├── pyproject.toml         # 의존성 정의
-├── uv.lock                # 팀 공용 환경 잠금
-└── README.md
+└── docs/                  # 설계 문서 · 실험 기록
 ```
 
 ## Usage
 
 ```bash
 uv sync --extra dev        # .venv 생성 + uv.lock 기준으로 동일 환경 설치
-cp .env.example .env       # OPENAI_API_KEY, TAVILY_API_KEY 입력
-uv run python app.py            # 전체 그래프 실행 → outputs/report.pdf
-uv run python app.py --replay   # 캐시로 API 키 없이 재생성
+cp .env.example .env       # OPENAI_API_KEY, TAVILY_API_KEY, 모델 이름 입력
+uv run python app.py       # 전체 그래프 실행 → PDF 생성
 ```
 
 ## Contributors
 
-- {이름} : Retrieval (문서 로딩 · 청킹, 골든 근거 세트, 임베딩 · 파서 실측, 언어 라우팅 검색, 기술 조사 에이전트)
-- {이름} : Graph & State (State 스키마, 관점 서브그래프와 검증 루프, 메인 그래프, 실행 스크립트, 재현 모드)
-- {이름} : Web Research (검색 · 요약 도구, 소스 레지스트리, 시장 · 이해관계자 · 도메인 에이전트 프롬프트)
-- {이름} : Evaluation & Report (평가 기준표 · TRL 규칙, 종합 · 보고서 생성 에이전트, PDF 변환, 설계 문서)
+- {이름} : RAG (문서 로딩 · 청킹 · 인덱스, `rag_retrieve`, 기술 조사 에이전트, 검색 평가 스크립트)
+- {이름} : 웹 도구와 관점 평가 (`web_search`, `fetch_and_summarize`, 시장 · 이해관계자 · 도메인 에이전트와 프롬프트)
+- {이름} : State · 그래프 · 검증 (State 정의, 그래프 조립, 검증 에이전트, 실행 스크립트)
+- {이름} : 종합 · 보고서 (평가 종합 · 보고서 생성 에이전트, 금지 표현 규칙, REFERENCE, PDF 변환)
