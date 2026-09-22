@@ -46,17 +46,28 @@ def report_node(state: GraphState, *, llm=None, output_dir: str | Path = "output
     prompt = PROMPT.read_text(encoding="utf-8")
 
     def write(chapter: str, guide: str, body: str = "") -> str:
-        request = {"chapter": chapter, "guide": guide, "context": context, "body": body}
-        response = llm.invoke([
-            ("system", prompt),
-            ("human", json.dumps(request, ensure_ascii=False)),
-        ])
-        text = response.content
-        if not isinstance(text, str) or not text.strip():
-            raise ValueError(f"{chapter}: 생성된 본문이 비어 있습니다")
-        check_forbidden(text, state["sources"])
-        cited_sources(text, state["sources"])
-        return text.strip()
+        """장별 본문 생성. 검사에 걸리면 무엇이 틀렸는지 알려주고 한 번 다시 요청."""
+        request = {
+            "chapter": chapter, "guide": guide, "body": body, "context": context,
+            # 인용에 쓸 수 있는 ID. 목록 밖의 태그는 검사에서 걸린다
+            "source_ids": [source.source_id for source in state["sources"]],
+        }
+        for retried in (False, True):
+            response = llm.invoke([
+                ("system", prompt),
+                ("human", json.dumps(request, ensure_ascii=False)),
+            ])
+            text = response.content
+            try:
+                if not isinstance(text, str) or not text.strip():
+                    raise ValueError("생성된 본문이 비어 있습니다")
+                check_forbidden(text, state["sources"])
+                cited_sources(text, state["sources"])
+                return text.strip()
+            except ValueError as error:
+                if retried:
+                    raise ValueError(f"{chapter}: {error}") from None
+                request["fix"] = f"직전 초안의 문제: {error}. 같은 문제를 반복하지 않는다."
 
     chapters = []
     for chapter, guide in CHAPTERS:

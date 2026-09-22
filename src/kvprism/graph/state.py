@@ -277,6 +277,17 @@ class JudgeResult(StrictModel):
     def failed_perspectives(self) -> list[Perspective]:
         return [item.perspective for item in self.judgments if not item.passed]
 
+    @property
+    def warnings(self) -> list[str]:
+        """재실행 후에도 남은 관점별 실패 사유를 경고 문구로 제공한다."""
+
+        return [
+            f"{item.perspective}: {issue}"
+            for item in self.judgments
+            if not item.passed
+            for issue in item.issues
+        ]
+
 
 # ---------------------------------------------------------------------------
 # 종합 및 보고서 결과
