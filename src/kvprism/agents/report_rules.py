@@ -4,6 +4,10 @@
 
 import re
 from collections.abc import Sequence
+from pathlib import Path
+from urllib.parse import urlparse
+
+import yaml
 
 from ..graph.state import Source
 
@@ -18,6 +22,9 @@ FORBIDDEN = re.compile(
 )
 # 인용 태그. 링크 표기 [제목](url)는 제외
 CITATION = re.compile(r"\[([^\]\n]+)\](?!\()")
+# 논문 서지 정보 출처. doc_id 기준
+RAG_CONFIG = Path(__file__).resolve().parents[3] / "configs" / "rag.yaml"
+PATENT_HOSTS = ("patents.google.com", "patents.uspto.gov", "kipris.or.kr")
 
 
 def check_forbidden(text: str, sources: Sequence[Source]) -> None:
@@ -48,15 +55,54 @@ def cited_sources(text: str, sources: Sequence[Source]) -> list[Source]:
 
 
 def build_references(sources: Sequence[Source]) -> str:
-    """REFERENCE 블록 생성."""
+    """REFERENCE 블록 생성. 과제 표기 형식을 출처 종류별로 적용."""
+    papers = _paper_docs()
     lines = ["# REFERENCE", ""]
     for source in sources:
-        date = source.published_at or "날짜 미상"
-        title = " ".join(source.title.split())
-        lines.append(
-            f"- [{source.source_id}] {source.author_or_org} ({date}). {title}. {source.url_or_page}"
-        )
+        if source.source_kind == "paper":
+            lines.append(_paper_line(source, papers.get(source.doc_id or "", {})))
+        elif any(host in source.url_or_page for host in PATENT_HOSTS):
+            lines.append(_patent_line(source))
+        else:
+            lines.append(_web_line(source))
     return "\n".join(lines)
+
+
+def _paper_docs() -> dict:
+    """configs/rag.yaml의 논문 서지. 파일이 없으면 빈 값."""
+    if not RAG_CONFIG.exists():
+        return {}
+    return yaml.safe_load(RAG_CONFIG.read_text(encoding="utf-8")).get("docs") or {}
+
+
+def _paper_line(source: Source, meta: dict) -> str:
+    # 논문 : 저자(YYYY). 논문제목. *학술지/학회명*, 번호.
+    # 저자 뒤 소속 괄호는 연도 괄호와 겹치므로 제거
+    author = re.sub(r"\s*\([^)]*\)$", "", meta.get("authors") or source.author_or_org)
+    year = str(meta.get("published") or source.published_at or "")[:4] or "연도 미상"
+    title = _plain(meta.get("title") or source.title)
+    tail = f" *arXiv*, {meta['arxiv']}." if meta.get("arxiv") else f" {source.url_or_page}"
+    return f"- [{source.source_id}] {author} ({year}). {title}.{tail}"
+
+
+def _web_line(source: Source) -> str:
+    # 기타 : 기관명 또는 작성자(YYYY-MM-DD). *제목*. 사이트명, URL
+    date = source.published_at or "날짜 미상"
+    site = urlparse(source.url_or_page).netloc.removeprefix("www.") or source.url_or_page
+    return (
+        f"- [{source.source_id}] {source.author_or_org} ({date}). "
+        f"*{_plain(source.title)}*. {site}, {source.url_or_page}"
+    )
+
+
+def _patent_line(source: Source) -> str:
+    # 특허 : 출원인(YYYY-MM). 특허명, 번호, URL. 번호 칸이 State에 없어 제목에 실린 값을 그대로 둔다
+    date = str(source.published_at)[:7] if source.published_at else "날짜 미상"
+    return f"- [{source.source_id}] {source.author_or_org} ({date}). *{_plain(source.title)}*, {source.url_or_page}"
+
+
+def _plain(value: str) -> str:
+    return " ".join(value.split())
 
 
 def _is_quote(line: str, sources: Sequence[Source]) -> bool:
