@@ -1,7 +1,4 @@
 """
-@file   : report_rules.py
-@writer : 오승민
-@date   : 2026-09-22
 @desc   : 종합 결과와 보고서에 공통으로 쓰는 표현·인용 검사와 REFERENCE 작성
 """
 
