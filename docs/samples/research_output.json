@@ -1,0 +1,651 @@
+{
+  "research": {
+    "technologies": [
+      {
+        "technology_id": "turboquant",
+        "overview": "TurboQuant는 고차원 벡터의 MSE 및 inner product distortion을 다루는 data-oblivious 온라인 vector quantization 방법으로, near-optimal distortion rate를 목표로 한다.",
+        "mechanism": [
+          {
+            "statement": "TurboQuant는 입력 벡터를 무작위 회전해 좌표에 집중된 Beta distribution을 유도하고, 고차원에서 좌표 간 near-independence를 활용해 좌표별 optimal scalar quantizer를 적용한다.",
+            "source_id": "turboquant:p1:1",
+            "stance": "neutral"
+          },
+          {
+            "statement": "TurboQuant의 기본 구조는 먼저 MSE 기준 vector quantizer를 적용한 뒤, residual에 1-bit Quantized JL(QJL) transform을 적용하는 2단계 과정이다.",
+            "source_id": "turboquant:p2:5",
+            "stance": "neutral"
+          },
+          {
+            "statement": "TurboQuantprod는 bit-width b−1의 TurboQuantmse를 먼저 구성하고, residual에 random projection matrix S와 sign 연산을 적용한 뒤 MSE 복원값과 QJL 복원값을 더해 복원한다.",
+            "source_id": "turboquant:p12:0",
+            "stance": "neutral"
+          },
+          {
+            "statement": "TurboQuantmse는 inner product 추정에서 bias를 만들 수 있으므로, residual에 적용하는 1-bit QJL 단계는 unbiased inner product quantizer를 만들기 위해 사용된다.",
+            "source_id": "turboquant:p1:1",
+            "stance": "positive"
+          }
+        ],
+        "performance_metrics": [
+          {
+            "statement": "TurboQuant는 최적 distortion lower bound와 비교해 약 2.7의 작은 상수 배 이내에 있다.",
+            "source_id": "turboquant:p1:2",
+            "stance": "positive"
+          },
+          {
+            "statement": "bit-width가 b = 1일 때 TurboQuant의 distortion은 최적값에서 약 1.45배 이내이며, 이는 실험 결과로도 확인되었다.",
+            "source_id": "turboquant:p6:1",
+            "stance": "positive"
+          },
+          {
+            "statement": "Llama-3.1-8B-Instruct의 Needle-In-A-Haystack 평가에서 문서 크기를 4k부터 104k tokens까지 변화시켰을 때, TurboQuant는 uncompressed baseline과 동일한 exact performance를 보였다.",
+            "source_id": "turboquant:p19:1",
+            "stance": "positive"
+          },
+          {
+            "statement": "LongBench-V1에서 Llama-3.1-8B-Instruct에 대해 TurboQuant는 3.5 bits per channel 설정에서 Average 50.06을 기록했다.",
+            "source_id": "turboquant:p20:0",
+            "stance": "positive"
+          },
+          {
+            "statement": "KV cache 압축에서 TurboQuant는 3.5 bits per channel로 absolute quality neutrality를 달성했고, 2.5 bits per channel에서는 marginal quality degradation을 보였다.",
+            "source_id": "turboquant:p1:2",
+            "stance": "positive"
+          },
+          {
+            "statement": "Llama-3.1-8B-Instruct와 Ministral-7B-Instruct를 사용한 LongBench-E 평가에서 TurboQuant는 다른 방법보다 높은 average scores를 달성했다.",
+            "source_id": "turboquant:p18:1",
+            "stance": "positive"
+          },
+          {
+            "statement": "TurboQuant는 quantized vectors를 최소 4.5× 압축하면서 unquantized models와 comparable performance를 유지했다.",
+            "source_id": "turboquant:p18:3",
+            "stance": "positive"
+          },
+          {
+            "statement": "DBpedia Entities의 nearest neighbor search 실험에서 TurboQuant는 모든 실험에서 Product Quantization과 RabitQ보다 recall ratio 기준으로 높은 성능을 보였다.",
+            "source_id": "turboquant:p20:3",
+            "stance": "positive"
+          }
+        ],
+        "experimental_conditions": [
+          {
+            "statement": "모든 실험은 단일 NVIDIA A100 GPU에서 수행되었다.",
+            "source_id": "turboquant:p15:1",
+            "stance": "neutral"
+          },
+          {
+            "statement": "KV cache 실험은 Llama-3.1-8B-Instruct 모델을 사용하고 문서 크기를 4k에서 104k tokens까지 변화시킨 Needle-In-A-Haystack 설정으로 수행되었다.",
+            "source_id": "turboquant:p17:1",
+            "stance": "neutral"
+          },
+          {
+            "statement": "LongBench 실험에서는 single- 및 multi-document question-answering, summarization, few-shot learning, synthetic tasks, code completion을 포함하는 LongBench-E subset을 사용했다.",
+            "source_id": "turboquant:p18:0",
+            "stance": "neutral"
+          },
+          {
+            "statement": "Inner product 및 MSE의 이론적 결과 검증 실험에서는 OpenAI embeddings로 인코딩된 1536-dimensional DBpedia Entities 공간에서 100,000개 data points를 무작위로 표본 추출했다.",
+            "source_id": "turboquant:p19:1",
+            "stance": "neutral"
+          },
+          {
+            "statement": "Nearest neighbor search 비교에서는 DBpedia Entities를 OpenAI embeddings로 1536-dimensional 및 3072-dimensional 공간에 인코딩하고, TurboQuant를 Product Quantization 및 RabitQ와 비교했다.",
+            "source_id": "turboquant:p19:2",
+            "stance": "neutral"
+          },
+          {
+            "statement": "Llama-3.1-8B-Instruct의 KV cache 비교 실험은 full KV cache의 25%만 사용하는 memory compression ratio 0.25에서 수행되었다.",
+            "source_id": "turboquant:p17:2",
+            "stance": "neutral"
+          }
+        ],
+        "limitations": [
+          {
+            "statement": "MSE에 최적화된 quantizer는 inner product에 대해 unbiased estimator를 제공하지 않는다.",
+            "source_id": "turboquant:p2:5",
+            "stance": "negative"
+          },
+          {
+            "statement": "TurboQuantmse는 inner product 추정에서 bias를 가지며, bit count가 증가하면 bias가 감소해 높은 bit count에서는 TurboQuantprod보다 우수해질 수 있다.",
+            "source_id": "turboquant:p16:2",
+            "stance": "negative"
+          },
+          {
+            "statement": "평균 bit-width를 5% 줄일 수 있는 optimal prefix coding 기법은 gain이 제한적이어서 simplicity와 speed를 유지하기 위해 TurboQuant에 포함하지 않았다.",
+            "source_id": "turboquant:p11:3",
+            "stance": "negative"
+          }
+        ],
+        "trl_signals": [
+          {
+            "statement": "논문은 TurboQuant를 online application에 적합한 data-oblivious algorithm으로 제시한다.",
+            "source_id": "turboquant:p1:0",
+            "stance": "positive"
+          },
+          {
+            "statement": "실험은 단일 NVIDIA A100 GPU에서 수행되었으며, 이론 검증과 KV cache quantization 및 nearest neighbor vector search의 downstream task 평가를 포함한다.",
+            "source_id": "turboquant:p15:1",
+            "stance": "neutral"
+          },
+          {
+            "statement": "TurboQuant는 Llama-3.1-8B-Instruct 및 Ministral-7B-Instruct의 실제 long-context generation과 KV cache compression 평가에 적용되었다.",
+            "source_id": "turboquant:p18:1",
+            "stance": "neutral"
+          },
+          {
+            "statement": "TurboQuant는 modern AI workloads를 위한 accelerator-friendly 알고리즘으로 설계되었다.",
+            "source_id": "turboquant:p2:4",
+            "stance": "positive"
+          }
+        ]
+      },
+      {
+        "technology_id": "itme",
+        "overview": "ITME는 CXL-hybrid memory를 활용해 GPU 서버에 TB-scale의 byte-addressable 원격 메모리 확장을 제공하고, LLM의 결정론적 접근 패턴을 이용한 다중 계층 DMA prefetching으로 모델 가중치와 KV cache를 GPU로 이동하는 아키텍처이다. 원문 확인 불가: 전체 소프트웨어·하드웨어 구성의 세부 사양",
+        "mechanism": [
+          {
+            "statement": "ITME는 remote resource를 byte-addressable memory로 구성하여 GPU 서버가 standard RDMA를 통해 대규모 model weights와 KV caches에 접근하도록 한다.",
+            "source_id": "itme:p2:2",
+            "stance": "positive"
+          },
+          {
+            "statement": "ITME는 CXL-hybrid memory에서 host memory를 거쳐 GPU로 데이터를 이동하는 pipelined, multitier DMA prefetching mechanism을 사용한다.",
+            "source_id": "itme:p7:2",
+            "stance": "neutral"
+          },
+          {
+            "statement": "Model weights는 실행 흐름에 맞춰 layer-by-layer로 streaming되고, KV cache blocks는 초기 저장 시의 spatial locality를 보존하도록 원래의 aggregated order로 가져온다.",
+            "source_id": "itme:p7:2",
+            "stance": "neutral"
+          },
+          {
+            "statement": "ITME는 KV cache에 layer-wise prefetching을 적용하여 layer L의 GPU computation과 layer L+1의 DMA transfer를 overlap한다.",
+            "source_id": "itme:p7:6",
+            "stance": "positive"
+          },
+          {
+            "statement": "CXL-hybrid memory는 NAND flash와 hardware-managed DRAM cache를 통합하고, DRAM cache를 backend read latency를 가리는 high-speed buffer로 사용한다.",
+            "source_id": "itme:p4:1",
+            "stance": "positive"
+          },
+          {
+            "statement": "CXL-hybrid memory의 internal hardware-level prefetcher는 SSD에서 integrated DRAM cache로 데이터를 이동하며, user-level prefetcher API는 LLM inference framework가 이 전송을 명시적으로 trigger하고 제어하도록 한다.",
+            "source_id": "itme:p2:3",
+            "stance": "neutral"
+          }
+        ],
+        "performance_metrics": [
+          {
+            "statement": "ITME는 large-scale LLM inference에서 NVMe-oF-based disaggregated storage baseline 대비 1.80× throughput improvement를 달성했다.",
+            "source_id": "itme:p2:4",
+            "stance": "positive"
+          },
+          {
+            "statement": "ITME는 CPU-offloading을 개선하여 최대 35.7% throughput improvement를 달성했다.",
+            "source_id": "itme:p1:2",
+            "stance": "positive"
+          },
+          {
+            "statement": "FPGA prototype은 DRAM cache hit 조건에서 reads 평균 18 GB/s와 writes 평균 12 GB/s를 달성했으며, CMM configuration 대비 20–25% performance gap을 보였다.",
+            "source_id": "itme:p10:8",
+            "stance": "neutral"
+          },
+          {
+            "statement": "Llama-3.1 8B의 10.5 GB footprint와 Llama-3.1 70B의 105 GB footprint 조건에서 두 모델 모두 near-baseline performance를 유지했으며, baseline 대비 delta는 1–5%였다.",
+            "source_id": "itme:p10:6",
+            "stance": "positive"
+          }
+        ],
+        "experimental_conditions": [
+          {
+            "statement": "ITME 평가는 Llama-3.1 8B 및 70B model과 ShareGPT dataset을 사용했으며, Mooncake dataset으로 별도 case study를 수행했다.",
+            "source_id": "itme:p9:2",
+            "stance": "neutral"
+          },
+          {
+            "statement": "GPU Memory(T1) 대비 평가는 ShareGPT dataset에서 128 concurrent conversations, conversation당 최대 5 turns, conversation당 최소 2000 tokens 조건으로 수행되었고, Turns 3–5에서 total KV cache footprint는 40 GB였다.",
+            "source_id": "itme:p9:3",
+            "stance": "neutral"
+          },
+          {
+            "statement": "Multi-turn 평가에서는 ShareGPT dataset의 256 concurrent conversations와 35-turn benchmark를 사용했으며, CPU-offload baseline은 caching을 위해 128 GB host memory를 할당했다.",
+            "source_id": "itme:p9:6",
+            "stance": "neutral"
+          },
+          {
+            "statement": "Weight-only prefetching 평가는 Mooncake workload에서 batch size 16과 4K input sequence length 조건으로 수행되었다.",
+            "source_id": "itme:p10:5",
+            "stance": "neutral"
+          },
+          {
+            "statement": "ITME는 vLLM v0.17.0의 highly optimized version에 구현되어 평가되었다.",
+            "source_id": "itme:p9:0",
+            "stance": "neutral"
+          }
+        ],
+        "limitations": [
+          {
+            "statement": "ITME는 local GPU memory와 비교할 때 remote CXL-hybrid memory의 latency에 의해 제약된다.",
+            "source_id": "itme:p9:5",
+            "stance": "negative"
+          },
+          {
+            "statement": "Layer-wise access는 staging buffer occupancy를 증가시킨다.",
+            "source_id": "itme:p7:6",
+            "stance": "negative"
+          },
+          {
+            "statement": "측정 throughput과 theoretical ideal bandwidth 사이의 marginal gap은 3-stage metadata updating overhead에 주로 기인한다.",
+            "source_id": "itme:p5:3",
+            "stance": "negative"
+          },
+          {
+            "statement": "CXL-hybrid memory가 NAND flash를 통합하므로 장기 사용을 위해 SSD durability 관리가 필요하다.",
+            "source_id": "itme:p5:3",
+            "stance": "negative"
+          }
+        ],
+        "trl_signals": [
+          {
+            "statement": "ITME의 performance potential은 production-grade SK Hynix CMM과 PCIe Gen5 NVMe SSD를 사용해 평가되었고, functional feasibility는 FPGA-based hardware prototype으로 검증되었다.",
+            "source_id": "itme:p2:3",
+            "stance": "neutral"
+          },
+          {
+            "statement": "FPGA prototype은 Intel Agilex 7 I-Series FPGA에 구현되었으며, 32 GB DDR4 DRAM을 두 개의 SK Hynix Platinum P51 PCIe Gen5 NVMe SSD용 hardware-managed cache로 통합했다.",
+            "source_id": "itme:p8:6",
+            "stance": "neutral"
+          },
+          {
+            "statement": "Performance-potential platform은 SK Hynix CMM과 두 개의 KIOXIA PCIe Gen5 NVMe SSD를 통합했으며, CMM capacity 중 32 GB를 DRAM cache로 사용했다.",
+            "source_id": "itme:p8:6",
+            "stance": "neutral"
+          },
+          {
+            "statement": "ITME는 highly optimized vLLM v0.17.0에 구현되어 평가되었다.",
+            "source_id": "itme:p9:0",
+            "stance": "neutral"
+          },
+          {
+            "statement": "ITME는 기존 software-level tiering mechanisms와 fully compatible하며, high-performance memory backend로 established inference stacks에 통합될 수 있도록 설계되었다.",
+            "source_id": "itme:p11:4",
+            "stance": "neutral"
+          }
+        ]
+      }
+    ]
+  },
+  "sources": [
+    {
+      "source_id": "turboquant:p1:1",
+      "source_kind": "paper",
+      "title": "TurboQuant: Online Vector Quantization with Near-optimal Distortion Rate",
+      "author_or_org": "Zandieh, A. et al.",
+      "published_at": "2025-04-28",
+      "url_or_page": "[TQ p.1]",
+      "excerpt": "applications, achieve near-optimal distortion rates (within a small constant factor) across all bit-widths and dimensions. TurboQuant achieves this by randomly rotating input vectors, inducing a concentrated Beta distribution on coordinates, and leveraging the near-independence property of distinct coordinates in high dimensions to simply apply optimal scalar quantizers per each coordinate. Recognizing that MSE-optimal quantizers introduce bias in inner product estimation, we propose a two-stage approach: applying an MSE quantizer followed by a 1-bit Quantized JL (QJL) transform on the residual, resulting in an unbiased inner product quantizer. We also provide a formal proof of the information-theoretic lower bounds on best achievable distortion rate by any vector quantizer, demonstrating",
+      "doc_id": "turboquant"
+    },
+    {
+      "source_id": "turboquant:p2:5",
+      "source_kind": "paper",
+      "title": "TurboQuant: Online Vector Quantization with Near-optimal Distortion Rate",
+      "author_or_org": "Zandieh, A. et al.",
+      "published_at": "2025-04-28",
+      "url_or_page": "[TQ p.2]",
+      "excerpt": "workloads. The core of TurboQuant is a two-stage process. First, we develop a vector quantizer with optimal distortion rate in terms of mean-squared error (MSE). Subsequently, we apply a 1-bit quantizer to the residual, resulting in an unbiased and low-distortion inner product quantizer. We demonstrate that quantizers optimized for MSE do not produce unbiased estimators for inner products, and 2",
+      "doc_id": "turboquant"
+    },
+    {
+      "source_id": "turboquant:p12:0",
+      "source_kind": "paper",
+      "title": "TurboQuant: Online Vector Quantization with Near-optimal Distortion Rate",
+      "author_or_org": "Zandieh, A. et al.",
+      "published_at": "2025-04-28",
+      "url_or_page": "[TQ p.12]",
+      "excerpt": "Algorithm 2 TurboQuantprod: optimized for inner product 1: input: dimension d and bit-width b // Global Parameters for Setting up TurboQuantprod 2: Instantiate a TurboQuantmse with bit-width b −1 as per Algorithm 1 3: Generate a random projection matrix S ∈Rd×d with i.i.d. entries Si,j ∼N(0, 1) 4: Procedure Quantprod(x) 5: idx ←Quantmse(x) 6: r ←x −DeQuantmse(idx) {residual vector} 7: qjl ←sign (S · r) {QJL on residual vector} 8: output: (idx, qjl, ∥r∥2) 9: Procedure DeQuantprod(idx, qjl, γ) 10: ̃xmse ←DeQuantmse(idx) 11: ̃xqjl ← √ π/2 d · γ · S⊤· qjl 12: output: ̃xmse + ̃xqjl 3.2 Inner-product Optimal TurboQuant For important applications like nearest neighbor search, having an unbiased inner product estimator is essential. However, TurboQuantmse presented in Section 3.1 does not provide",
+      "doc_id": "turboquant"
+    },
+    {
+      "source_id": "turboquant:p1:2",
+      "source_kind": "paper",
+      "title": "TurboQuant: Online Vector Quantization with Near-optimal Distortion Rate",
+      "author_or_org": "Zandieh, A. et al.",
+      "published_at": "2025-04-28",
+      "url_or_page": "[TQ p.1]",
+      "excerpt": "lower bounds on best achievable distortion rate by any vector quantizer, demonstrating that TurboQuant closely matches these bounds, differing only by a small constant (≈2.7) factor. Experimental results validate our theoretical findings, showing that for KV cache quantization, we achieve absolute quality neutrality with 3.5 bits per channel and marginal quality degradation with 2.5 bits per channel. Furthermore, in nearest neighbor search tasks, our method outperforms existing product quantization techniques in recall while reducing indexing time to virtually zero. 1 Introduction Vector quantization (VQ) in Euclidean space is crucial for efficiently handling high-dimensional vectors across a spectrum of computational domains, from training and deploying large-scale AI and deep learning",
+      "doc_id": "turboquant"
+    },
+    {
+      "source_id": "turboquant:p6:1",
+      "source_kind": "paper",
+      "title": "TurboQuant: Online Vector Quantization with Near-optimal Distortion Rate",
+      "author_or_org": "Zandieh, A. et al.",
+      "published_at": "2025-04-28",
+      "url_or_page": "[TQ p.6]",
+      "excerpt": "lower bound. Notably, for smaller bit-widths, this factor significantly decreases. For instance, at a bit-width of b = 1 TurboQuant achieves a distortion that is only a factor of approximately 1.45 away from the optimal which is also confirmed by our experimental results, indicating its efficiency in low-bit-width scenarios. Experimental Results. In Section 4.1, we empirically validate our theoretical distortion bounds, demonstrating that TurboQuant’s observed distortions closely align with our predictions across various real-world datasets, approaching the established lower bounds. Furthermore, in Section 4.2 and Section 4.3, we showcase TurboQuant’s efficacy in online KV cache quantization. Specifically, we achieve perfect long-context retrieval in needle-in-a-haystack tasks and",
+      "doc_id": "turboquant"
+    },
+    {
+      "source_id": "turboquant:p19:1",
+      "source_kind": "paper",
+      "title": "TurboQuant: Online Vector Quantization with Near-optimal Distortion Rate",
+      "author_or_org": "Zandieh, A. et al.",
+      "published_at": "2025-04-28",
+      "url_or_page": "[TQ p.19]",
+      "excerpt": "TurboQuant Score: 0.997 4k 6k 10k 16k 26k 41k 65k 104k Token Limit 0 11 22 33 44 56 67 78 89 100 Depth Percent 0.00 0.25 0.50 0.75 1.00 Score Figure 4: Evaluation of Llama-3.1-8B-Instruct on the “Needle-In-A-Haystack” test, where a model must retrieve a hidden sentence from long-context sequences. While some methods struggle with recall, TurboQuant, despite being more than 4× quantized, achieves the same exact performance as the uncompressed baseline. 4.4 Near Neighbour Search Experiments In this section, we establish the strength of our proposed method, even in the context of nearneighbor search. We conduct our experiments using the DBpedia [53] Entities dataset, which has been encoded into 1536-dimensional1 and 3072-dimensional 2 spaces using OpenAI3 embeddings. Additionally, we",
+      "doc_id": "turboquant"
+    },
+    {
+      "source_id": "turboquant:p20:0",
+      "source_kind": "paper",
+      "title": "TurboQuant: Online Vector Quantization with Near-optimal Distortion Rate",
+      "author_or_org": "Zandieh, A. et al.",
+      "published_at": "2025-04-28",
+      "url_or_page": "[TQ p.20]",
+      "excerpt": "Method KV Size SingleQA MultiQA Summarization Few shot Synthetic Code Average Llama-3.1-8B-Instruct Full Cache 16 45.29 45.16 26.55 68.38 59.54 46.28 50.06 KIVI 3 43.38 37.99 27.16 68.38 59.50 44.68 48.50 KIVI 5 45.04 45.70 26.47 68.57 59.55 46.41 50.16 PolarQuant 3.9 45.18 44.48 26.23 68.25 60.07 45.24 49.78 TurboQuant (ours) 2.5 44.16 44.96 24.80 68.01 59.65 45.76 49.44 TurboQuant (ours) 3.5 45.01 45.31 26.00 68.63 59.95 46.17 50.06 Ministral-7B-Instruct Full Cache 16 47.53 49.06 26.09 66.83 53.50 47.90 49.89 TurboQuant (ours) 2.5 48.38 49.22 24.91 66.69 53.17 46.83 49.62 Table 1: LongBench-V1 [10] results of various KV cache compression methods on Llama-3.1-8B- Instruct. Approach d=200 d=1536 d=3072 Product Quantization 37.04 239.75 494.42 RabitQ 597.25 2267.59 3957.19 TurboQuant 0.0007",
+      "doc_id": "turboquant"
+    },
+    {
+      "source_id": "turboquant:p18:1",
+      "source_kind": "paper",
+      "title": "TurboQuant: Online Vector Quantization with Near-optimal Distortion Rate",
+      "author_or_org": "Zandieh, A. et al.",
+      "published_at": "2025-04-28",
+      "url_or_page": "[TQ p.18]",
+      "excerpt": "To ensure a balanced evaluation across different context lengths, we employ LongBench-E, a subset designed with a more uniform length distribution. This enables a fair assessment of each model’s performance across varying context sizes, making it a more reliable benchmark for evaluating compression techniques. We compare TurboQuant against the leading baseline methods introduced in Section 4.2, using both Llama-3.1-8B-Instruct and Ministral-7B-Instruct. Unlike existing approaches such as KIVI and PolarQuant, which leave generated tokens unquantized, our method applies quantization even during the streaming generation process. As shown in Table 1, our approach outperforms other methods for both Llama-3.1-8B-Instruct and Ministral-7B-Instruct, achieving significantly higher average scores.",
+      "doc_id": "turboquant"
+    },
+    {
+      "source_id": "turboquant:p18:3",
+      "source_kind": "paper",
+      "title": "TurboQuant: Online Vector Quantization with Near-optimal Distortion Rate",
+      "author_or_org": "Zandieh, A. et al.",
+      "published_at": "2025-04-28",
+      "url_or_page": "[TQ p.18]",
+      "excerpt": "different ratio of outliers and regular channels leads to a higher effective bit precision. Despite using fewer bits than competing techniques, TurboQuant maintains performance comparable to unquantized models. Remarkably, we achieve this while compressing quantized vectors by at least a factor of 4.5×. 18",
+      "doc_id": "turboquant"
+    },
+    {
+      "source_id": "turboquant:p20:3",
+      "source_kind": "paper",
+      "title": "TurboQuant: Online Vector Quantization with Near-optimal Distortion Rate",
+      "author_or_org": "Zandieh, A. et al.",
+      "published_at": "2025-04-28",
+      "url_or_page": "[TQ p.20]",
+      "excerpt": "inefficiencies. Despite the advantages granted to the baseline methods, TurboQuant consistently outperforms both Product Quantization and RabitQ in terms of recall ratio across all experiments. This demonstrates the robustness and efficiency of our approach, making it a compelling alternative for highdimensional quantization-based search tasks. 20",
+      "doc_id": "turboquant"
+    },
+    {
+      "source_id": "turboquant:p15:1",
+      "source_kind": "paper",
+      "title": "TurboQuant: Online Vector Quantization with Near-optimal Distortion Rate",
+      "author_or_org": "Zandieh, A. et al.",
+      "published_at": "2025-04-28",
+      "url_or_page": "[TQ p.15]",
+      "excerpt": "and aligns seamlessly with our upper bounds presented in Theorem 1 and Theorem 2. 4 Experiments All experiments are performed using a single NVIDIA A100 GPU. The experimental section is divided into two parts: one to empirically validate the theoretical results, and another to evaluate the performance of our methods on downstream tasks, specifically KV cache quantization and nearest neighbor vector search. 4.1 Empirical Validation In this section, we verify the theoretical results established in previous sections. We conduct our experiments using the DBpedia Entities dataset, which has been encoded into a 1536-dimensional space using OpenAI3 embeddings. To perform our experiments, we randomly sample 100,000 data points from the dataset, denoted as training set, which serves as our primary",
+      "doc_id": "turboquant"
+    },
+    {
+      "source_id": "turboquant:p17:1",
+      "source_kind": "paper",
+      "title": "TurboQuant: Online Vector Quantization with Near-optimal Distortion Rate",
+      "author_or_org": "Zandieh, A. et al.",
+      "published_at": "2025-04-28",
+      "url_or_page": "[TQ p.17]",
+      "excerpt": "error remains constant for TurboQuantprod, while in TurboQuantmse increases with the average inner product. Bit-width is b = 2. sentence (the ”needle”) at an arbitrary location within a much larger text (the ”haystack”) and assessing whether the model can successfully extract it. Following the experimental setup of Fu et al. [21], we conduct evaluations using the Llama-3.1- 8B-Instruct model. To analyze performance across different input sequence lengths, we vary the document size from 4k to 104k tokens. The primary metric used for evaluation is the recall score, which measures how accurately the model retrieves the hidden sentence. For comparison, we benchmark our approach against several state-of-the-art memory-efficient methods, including PolarQuant [28], SnapKV [38], PyramidKV [12],",
+      "doc_id": "turboquant"
+    },
+    {
+      "source_id": "turboquant:p18:0",
+      "source_kind": "paper",
+      "title": "TurboQuant: Online Vector Quantization with Near-optimal Distortion Rate",
+      "author_or_org": "Zandieh, A. et al.",
+      "published_at": "2025-04-28",
+      "url_or_page": "[TQ p.18]",
+      "excerpt": "(a) inner-prod error 1 2 3 4 5 Bitwidth (b) 10−5 10−3 Inner Product Error (Dprod) TurboQuantmse TurboQuantprod Lower Bound: 1 d4−b Upper Bound: √ 3π2 d 4−b (b) MSE 1 2 3 4 5 Bitwidth (b) 10−3 10−2 10−1 Mean squared error (Dmse) TurboQuantmse Lower Bound: 4−b Upper Bound: √ 3π 24−b Figure 3: Comparison of inner-product error and MSE against theoretical bounds across different bit ratios. 4.3 End-to-end Generation on LongBench We experiment with various KV cache compression algorithms on the LongBench dataset [10], which encompasses a broad range of long-text scenarios, including single- and multi-document questionanswering, summarization, few-shot learning, synthetic tasks, and code completion. To ensure a balanced evaluation across different context lengths, we employ LongBench-E, a subset",
+      "doc_id": "turboquant"
+    },
+    {
+      "source_id": "turboquant:p19:2",
+      "source_kind": "paper",
+      "title": "TurboQuant: Online Vector Quantization with Near-optimal Distortion Rate",
+      "author_or_org": "Zandieh, A. et al.",
+      "published_at": "2025-04-28",
+      "url_or_page": "[TQ p.19]",
+      "excerpt": "into 1536-dimensional1 and 3072-dimensional 2 spaces using OpenAI3 embeddings. Additionally, we evaluate performance on a lower-dimensional dataset, utilizing the standard GloVe [45] embeddings. To construct our experimental setup, we randomly sample 100,000 data points from the dataset, denoted as training set, which serves as our primary training and evaluation set. Furthermore, we extract 1,000 distinct entries, denoted as query set, to be used as query points for datasets that do not explicitly provide a query set. For the GloVe dataset, we use a pre-existing query set consisting of 10,000 points. We compare our method, TurboQuant, against two baseline quantization approaches: Product Quantization (PQ) and RabitQ [22]. To ensure a fair comparison, we quantize the dataset training set",
+      "doc_id": "turboquant"
+    },
+    {
+      "source_id": "turboquant:p17:2",
+      "source_kind": "paper",
+      "title": "TurboQuant: Online Vector Quantization with Near-optimal Distortion Rate",
+      "author_or_org": "Zandieh, A. et al.",
+      "published_at": "2025-04-28",
+      "url_or_page": "[TQ p.17]",
+      "excerpt": "state-of-the-art memory-efficient methods, including PolarQuant [28], SnapKV [38], PyramidKV [12], and KIVI [41]. Each method is tested under a memory compression ratio of 0.25, meaning that only 25% of the full KV cache is utilized. The results, illustrated in Fig. 4, reveal that quantization methods with theoretical guarantees, such as PolarQuant and TurboQuant, outperform token-level compression techniques like SnapKV and PyramidKV, as well as scalar quantization approaches like KIVI, which lack formal theoretical guarantees. Notably, TurboQuant achieves identical performance to the full-precision model, even at 4× compression, making it a robust solution for long-context processing. 17",
+      "doc_id": "turboquant"
+    },
+    {
+      "source_id": "turboquant:p16:2",
+      "source_kind": "paper",
+      "title": "TurboQuant: Online Vector Quantization with Near-optimal Distortion Rate",
+      "author_or_org": "Zandieh, A. et al.",
+      "published_at": "2025-04-28",
+      "url_or_page": "[TQ p.16]",
+      "excerpt": "MSE between the original and quantized vectors across different bit ratios. These plots are drawn alongside the upper and lower bounds established in our theoretical analysis. Our observations confirm that the results align with the theoretical predictions. Specifically, for inner product estimation, the TurboQuantprod approach performs better at lower bit ratios. However, as the bit count increases, TurboQuantmse reduces bias and ultimately achieves superior performance in inner product estimation. 4.2 Needle-In-A-Haystack The “Needle-In-A-Haystack Test”” [32] is a benchmark designed to evaluate a model’s ability to retrieve specific information embedded within a long document. The test involves placing a unique 16",
+      "doc_id": "turboquant"
+    },
+    {
+      "source_id": "turboquant:p11:3",
+      "source_kind": "paper",
+      "title": "TurboQuant: Online Vector Quantization with Near-optimal Distortion Rate",
+      "author_or_org": "Zandieh, A. et al.",
+      "published_at": "2025-04-28",
+      "url_or_page": "[TQ p.11]",
+      "excerpt": "reduction occurs for b = 4, where the entropy of {pi}i∈[2b] is approximately 3.8. Detailed calculations for optimal prefix codes reveal that the average bit-width can be reduced by 5%. However, given the limited gain, we have chosen not to incorporate this technique into TurboQuant to maintain simplicity and speed. 11",
+      "doc_id": "turboquant"
+    },
+    {
+      "source_id": "turboquant:p1:0",
+      "source_kind": "paper",
+      "title": "TurboQuant: Online Vector Quantization with Near-optimal Distortion Rate",
+      "author_or_org": "Zandieh, A. et al.",
+      "published_at": "2025-04-28",
+      "url_or_page": "[TQ p.1]",
+      "excerpt": "TurboQuant: Online Vector Quantization with Near-optimal Distortion Rate Amir Zandieh Google Research zandieh@google.com Majid Daliri New York University daliri.majid@nyu.edu Majid Hadian Google DeepMind majidh@google.com Vahab Mirrokni Google Research mirrokni@google.com Abstract Vector quantization, a problem rooted in Shannon’s source coding theory, aims to quantize high-dimensional Euclidean vectors while minimizing distortion in their geometric structure. We propose TurboQuant to address both mean-squared error (MSE) and inner product distortion, overcoming limitations of existing methods that fail to achieve optimal distortion rates. Our data-oblivious algorithms, suitable for online applications, achieve near-optimal distortion rates (within a small constant factor) across all",
+      "doc_id": "turboquant"
+    },
+    {
+      "source_id": "turboquant:p2:4",
+      "source_kind": "paper",
+      "title": "TurboQuant: Online Vector Quantization with Near-optimal Distortion Rate",
+      "author_or_org": "Zandieh, A. et al.",
+      "published_at": "2025-04-28",
+      "url_or_page": "[TQ p.2]",
+      "excerpt": "low-latency, accurate estimations of inner products with query vectors, thereby enabling fast and precise nearest neighbor searches. Existing VQ algorithms present a trade-off: either they lack accelerator (vectorization) compatibility and exhibit slow computation, making them unsuitable for real-time AI applications like KV cache quantization, or they suffer from suboptimal distortion bounds relative to bit-width. Our objective is to introduce an algorithm that addresses these limitations. Specifically, we design TurboQuant: a lightweight, capable of online application (crucial for scenarios like KV cache quantization), and highly accelerator-friendly—a critical attribute for modern AI workloads. The core of TurboQuant is a two-stage process. First, we develop a vector quantizer with",
+      "doc_id": "turboquant"
+    },
+    {
+      "source_id": "itme:p2:2",
+      "source_kind": "paper",
+      "title": "ITME: Inference Tiered Memory Expansion with Disaggregated CXL-Hybrid Memories",
+      "author_or_org": "Jang, H. et al. (SK hynix)",
+      "published_at": "2026-06-10",
+      "url_or_page": "[ITME p.2]",
+      "excerpt": "of the CXL-hybrid-memory, while network communication overheads are mitigated via a pipelined, multi-tier DMA-based prefetching mechanism that orchestrates data transfers from ITME to the GPU via RDMA and host CPU memory. By overlapping this end-to-end data pipeline with GPU computation, ITME effectively masks total latency, enabling seamless TB-scale memory expansion for LLM inference. The main contributions of this work are: • ITME: Inference Tiered Memory Expansion: We propose ITME, a tiered memory expansion architecture based on CXL-hybrid-memory for TB-scale LLM workloads. By organizing remote resources into a byte-addressable memory, ITME enables GPU servers to access massive model weights and KV caches via standard RDMA, effectively extending memory capacity. • CXL-Hybrid Memory",
+      "doc_id": "itme"
+    },
+    {
+      "source_id": "itme:p7:2",
+      "source_kind": "paper",
+      "title": "ITME: Inference Tiered Memory Expansion with Disaggregated CXL-Hybrid Memories",
+      "author_or_org": "Jang, H. et al. (SK hynix)",
+      "published_at": "2026-06-10",
+      "url_or_page": "[ITME p.7]",
+      "excerpt": "the remote access latency. To mask this, ITME orchestrates a pipelined, multitier DMA prefetching mechanism that proactively migrates data from the remote CXL-hybrid memory to the GPU via host memory. This is enabled by the deterministic access patterns inherent to LLM inference. During execution, ITME synchronizes data movement by optimizing the transfer granularity for each data type. Model weights are streamed layer-by-layer to match the execution flow, whereas KV cache blocks are retrieved in their original aggregated order to preserve the spatial locality established during their initial storage in large chunks. To maximize throughput, ITME proactively prefetches these chunks into host memory at the onset of each inference turn, ensuring they are staged and ready for the subsequent",
+      "doc_id": "itme"
+    },
+    {
+      "source_id": "itme:p7:6",
+      "source_kind": "paper",
+      "title": "ITME: Inference Tiered Memory Expansion with Disaggregated CXL-Hybrid Memories",
+      "author_or_org": "Jang, H. et al. (SK hynix)",
+      "published_at": "2026-06-10",
+      "url_or_page": "[ITME p.7]",
+      "excerpt": "chunks are staged in the CPU staging buffer, the system balances a fundamental trade-off between block-wise and layerwise transfer granularities. While a block-wise approach enables rapid slot reclamation through a single DMA operation, it serializes execution and leaves the GPU idle until the entire block transfer completes. To align with model weight streaming and maximize pipeline efficiency, ITME adopts a layer-wise prefetching strategy for the KV cache. This strategy enables a fine-grained pipeline where the DMA transfer of layer L+ 1 overlaps with the GPU computation of layer L, effectively minimizing GPU idle time. Although layer-wise access extends buffer occupancy, ITME mitigates this by decoupling the staging cache from the CXL-hybrid memory ring buffer, sustaining",
+      "doc_id": "itme"
+    },
+    {
+      "source_id": "itme:p4:1",
+      "source_kind": "paper",
+      "title": "ITME: Inference Tiered Memory Expansion with Disaggregated CXL-Hybrid Memories",
+      "author_or_org": "Jang, H. et al. (SK hynix)",
+      "published_at": "2026-06-10",
+      "url_or_page": "[ITME p.4]",
+      "excerpt": "Internally, the device achieves this massive capacity by integrating a high-density NAND flash with a hardware-managed DRAM cache. This hybrid design operates entirely transparently to the upper-level software; the DRAM cache serves as a high-speed buffer to mask backend read latencies, ensuring the expanded NAND capacity delivers efficient performance. By operating over the PCIe physical layer and exposing itself to the host operating system as a CPU-less NUMA node, the device successfully bypasses the physical pin-count limitations of traditional DDR channels [39]. Consequently, CXL-hybrid memory provides legacy applications with a high-capacity, directly accessible memory space without requiring complex software-level memory management or incurring traditional storage overheads. 3.1",
+      "doc_id": "itme"
+    },
+    {
+      "source_id": "itme:p2:3",
+      "source_kind": "paper",
+      "title": "ITME: Inference Tiered Memory Expansion with Disaggregated CXL-Hybrid Memories",
+      "author_or_org": "Jang, H. et al. (SK hynix)",
+      "published_at": "2026-06-10",
+      "url_or_page": "[ITME p.2]",
+      "excerpt": "weights and KV caches via standard RDMA, effectively extending memory capacity. • CXL-Hybrid Memory Architecture: We design a CXLhybrid-memory architecture featuring an internal hardwarelevel prefetcher that hides storage overhead by moving data from SSDs into an integrated DRAM cache. Furthermore, we provide a user-level prefetcher API that allows LLM inference frameworks to explicitly trigger and control these transfers, enabling data delivery at near-maximum PCIe bandwidth through application-aware scheduling. • Empirical Potential Analysis and FPGA Prototyping: We validate ITME by evaluating its performance potential using production-grade SK hynix CMM [32] and Gen5 NVMe SSDs [18], while further demonstrating functional feasibility through an FPGA-based hardware prototype. Our",
+      "doc_id": "itme"
+    },
+    {
+      "source_id": "itme:p2:4",
+      "source_kind": "paper",
+      "title": "ITME: Inference Tiered Memory Expansion with Disaggregated CXL-Hybrid Memories",
+      "author_or_org": "Jang, H. et al. (SK hynix)",
+      "published_at": "2026-06-10",
+      "url_or_page": "[ITME p.2]",
+      "excerpt": "while further demonstrating functional feasibility through an FPGA-based hardware prototype. Our evaluation shows that ITME achieves a 1.80× throughput improvement over NVMe-oF-based disaggregated storage baselines in large-scale LLM inference. GPU Memory (T1) (a) Baseline: 4-Tier Structure Host Memory (T2) Local Storage (T3) Working KV Cache Spillover KV Cache Warm KV Cache Remote Storage (T3.5 / T4) Cold or Shared KV context Direct Memory Access File system (b) ITME structure GPU Memory (T1) System Memory (T2) Working KV Caches Spillover KV Caches Direct Memory Access Network (e.g., RDMA) CXL-Hybrid Memory (T3.5) Network (e.g., RDMA) DRAM Cache NVMe SSDs Staging buffer Act. Wegihts Shared KV context HW-managed Act. Weights T3.5 (i.e., ICMS) Staging Staging Figure 1: Structural",
+      "doc_id": "itme"
+    },
+    {
+      "source_id": "itme:p1:2",
+      "source_kind": "paper",
+      "title": "ITME: Inference Tiered Memory Expansion with Disaggregated CXL-Hybrid Memories",
+      "author_or_org": "Jang, H. et al. (SK hynix)",
+      "published_at": "2026-06-10",
+      "url_or_page": "[ITME p.1]",
+      "excerpt": "deterministic access patterns of voluminous model weights and prefix caches enable the system to proactively manage data movement across the memory-storage hierarchy. Leveraging this predictability, ITME implements a pipelined, multi-tier DMA-based prefetching that orchestrates seamless data movement directly from the CXL-hybrid memory device to GPU memory. We validate ITME by evaluating its performance potential with production-grade SK Hynix CMM and PCIe Gen5 NVMe SSDs, while further demonstrating its functional feasibility through an FPGA-based hardware prototype. Overall, ITME enhances conventional CPU-offloading by providing additional remote memory expansion to accommodate large KV cache footprints beyond host memory limits, achieving up to a 35.7% throughput improvement. 1",
+      "doc_id": "itme"
+    },
+    {
+      "source_id": "itme:p10:8",
+      "source_kind": "paper",
+      "title": "ITME: Inference Tiered Memory Expansion with Disaggregated CXL-Hybrid Memories",
+      "author_or_org": "Jang, H. et al. (SK hynix)",
+      "published_at": "2026-06-10",
+      "url_or_page": "[ITME p.10]",
+      "excerpt": "Evaluation Figure 13 demonstrates the hardware feasibility of the ITME architecture through an FPGA-based prototype. While the CMM-based platform provides an evaluation of peak performance potential, this implementation serves to validate the hardware-level control logic and the effectiveness of the software prefetcher in a real-world system environment. Figure 14 compares the bandwidth of the ITME CMM configuration with its FPGA prototype implementation. The FPGA prototype achieves an average of 18 GB/s for reads and 12 GB/s for writes during DRAM cache hits, representing a 20–25% performance gap 10",
+      "doc_id": "itme"
+    },
+    {
+      "source_id": "itme:p10:6",
+      "source_kind": "paper",
+      "title": "ITME: Inference Tiered Memory Expansion with Disaggregated CXL-Hybrid Memories",
+      "author_or_org": "Jang, H. et al. (SK hynix)",
+      "published_at": "2026-06-10",
+      "url_or_page": "[ITME p.10]",
+      "excerpt": "Since the baseline represents the theoretical performance upper bound, this analysis focuses on the efficiency of ITME in hiding network and storage overheads through its pipelined prefetching. Figure 12 (a) compares end-to-end performance results, where the gaps between baseline, local, and remote configurations quantify storage and network overheads, respectively. While the 10.5 GB footprint of the 8B model fits within the CXL-hybrid memory DRAM cache, the 105 GB footprint of the 70B model exceeds it, yet both maintain near-baseline performance with only 1–5% deltas. These results demonstrate that ITME effectively hides storage and network latencies. Figure 12 (b) evaluates the 70B model’s throughput while scaling the CXL-hybrid memory DRAM capacity. Our results show that a 4GB DRAM",
+      "doc_id": "itme"
+    },
+    {
+      "source_id": "itme:p9:2",
+      "source_kind": "paper",
+      "title": "ITME: Inference Tiered Memory Expansion with Disaggregated CXL-Hybrid Memories",
+      "author_or_org": "Jang, H. et al. (SK hynix)",
+      "published_at": "2026-06-10",
+      "url_or_page": "[ITME p.9]",
+      "excerpt": "This represents an optimized software-based offloading system that minimizes the performance impact of model weights. Models and Datasets. We evaluate the system using Llama-3.1 8B and 70B models to demonstrate the scalability of our architecture across different model scales. The evaluation utilizes the ShareGPT dataset [19] to construct multi-turn conversation workloads with diverse sequence lengths. Furthermore, we conduct a specialized case study using the Mooncake dataset [29] to analyze the system’s behavior. These datasets enable us to measure the system’s effectiveness in managing the cumulative growth of the KV cache footprint and its ability to mask retrieval latencies from the CXL-hybrid memory (T3.5) tier through software prefetching. 6 Evaluation 6.1 Performance: GPU Memory",
+      "doc_id": "itme"
+    },
+    {
+      "source_id": "itme:p9:3",
+      "source_kind": "paper",
+      "title": "ITME: Inference Tiered Memory Expansion with Disaggregated CXL-Hybrid Memories",
+      "author_or_org": "Jang, H. et al. (SK hynix)",
+      "published_at": "2026-06-10",
+      "url_or_page": "[ITME p.9]",
+      "excerpt": "memory (T3.5) tier through software prefetching. 6 Evaluation 6.1 Performance: GPU Memory (T1) vs. ITME The performance of ITME is evaluated using the ShareGPT dataset with a configuration of 128 concurrent conversations, each spanning up to 5 turns with a minimum of 2000 tokens per conversation. As memory pressure intensifies in later stages, we focus on Turns 3–5, where the total KV cache footprint reaches 40 GB. Figure 9 illustrates the time to first token (TTFT) speedup for the Llama-3.1 8B and 70B models, normalized against a GPU memory (T1) baseline utilizing recomputation. To ensure a fair evaluation, both the baselines and ITME are configured with weight offloading and prefetching enabled. To establish the upper performance bound 0 5 10 15 20 25 30 35 Turn 1.00 1.25 1.50 1.75 2.00",
+      "doc_id": "itme"
+    },
+    {
+      "source_id": "itme:p9:6",
+      "source_kind": "paper",
+      "title": "ITME: Inference Tiered Memory Expansion with Disaggregated CXL-Hybrid Memories",
+      "author_or_org": "Jang, H. et al. (SK hynix)",
+      "published_at": "2026-06-10",
+      "url_or_page": "[ITME p.9]",
+      "excerpt": "multi-turn inference performance of ITME against the CPU-offload and recompute-only baselines. The figure evaluates inference efficiency using 256 concurrent conversations from the ShareGPT dataset. To stress-test KV cache capacity, we designed a 35-turn benchmark that generates a massive total footprint. In this setup, the CPU-offload baseline allocates a large 128 GB host memory (T2) for caching. In contrast, ITME leverages the CXL-hybrid memory (T3.5) tier while utilizing only a fraction of host memory (T2) as a staging buffer. All results are normalized against a recomputation baseline to isolate the speedup enabled by ITME’s efficient multi-tier memory management. During the initial turns (turns 1–9), ITME exhibits comparable performance to the CPU-offload baseline. This is because",
+      "doc_id": "itme"
+    },
+    {
+      "source_id": "itme:p10:5",
+      "source_kind": "paper",
+      "title": "ITME: Inference Tiered Memory Expansion with Disaggregated CXL-Hybrid Memories",
+      "author_or_org": "Jang, H. et al. (SK hynix)",
+      "published_at": "2026-06-10",
+      "url_or_page": "[ITME p.10]",
+      "excerpt": "memory DRAM cache capacity of each backend using the same chunk-level data management. Within this scope, ITME demonstrates enhanced efficiency by effectively addressing I/O bottlenecks and latency through its integrated prefetching and CXL-hybrid memory architecture. 6.4 Impact of Multi-tier Weight Prefetching To isolate the impact of weight prefetching from prefix KV cache prefetching, we evaluate the performance of ITME by prefetching model weights only. We employ the Mooncake workload with a batch size of 16 and a 4K input sequence length. The primary objective of this evaluation is to demonstrate how closely ITME matches the host memory baseline, where all weights reside in host DRAM. Since the baseline represents the theoretical performance upper bound, this analysis focuses on the",
+      "doc_id": "itme"
+    },
+    {
+      "source_id": "itme:p9:0",
+      "source_kind": "paper",
+      "title": "ITME: Inference Tiered Memory Expansion with Disaggregated CXL-Hybrid Memories",
+      "author_or_org": "Jang, H. et al. (SK hynix)",
+      "published_at": "2026-06-10",
+      "url_or_page": "[ITME p.9]",
+      "excerpt": "Turn 3 Turn 4 Turn 5 0 1 2 3 4 Normalized TTFT Speedup (a) Llama-3.1 8B Recomp. ITME All-caching Hit Rate 0 20 40 60 80 100 Hit Rate (%) Turn 3 Turn 4 Turn 5 0 1 2 3 4 Normalized TTFT Speedup (b) Llama-3.1 70B Recomp. ITME All-caching Hit Rate 0 20 40 60 80 100 Hit Rate (%) Figure 9: Recomputation is set to 16 GB for 8B and 32 GB for 70B models, while All-caching consumes 80 GB of GPU memory. In contrast, ITME maintains a stable 16,GB footprint by offloading 10 GB to the Host/CXL staging. 5.1 Baselines and Benchmarks To demonstrate the advantages of ITME, we implement and evaluate it within a highly optimized version of vLLM (v0.17.0) [19]. Baseline (vLLM with CPU Offloading). By default, vLLM handles host memory pressure by evicting and recomputing KV caches, which incurs significant",
+      "doc_id": "itme"
+    },
+    {
+      "source_id": "itme:p9:5",
+      "source_kind": "paper",
+      "title": "ITME: Inference Tiered Memory Expansion with Disaggregated CXL-Hybrid Memories",
+      "author_or_org": "Jang, H. et al. (SK hynix)",
+      "published_at": "2026-06-10",
+      "url_or_page": "[ITME p.9]",
+      "excerpt": "configuration achieves a maximum speedup of 3.02× due to its inherent bandwidth advantage, ITME reaches a 1.81× speedup by turn 5. Although ITME is constrained by the latency of remote CXL-hybrid memory compared to local GPU memory, it offers a substantial performance gain over recomputation-based baselines. This improvement is realized whenever the system can fetch KV blocks from remote CXL-hybrid memory faster than the time required for recomputation. By successfully identifying access patterns and staging KV blocks in advance, the system minimizes the overhead of remote CXL-hybrid memory and maximizes inference efficiency. 6.2 Performance: Host Memory (T2) vs. ITME Figure 10 compares the multi-turn inference performance of ITME against the CPU-offload and recompute-only baselines. The",
+      "doc_id": "itme"
+    },
+    {
+      "source_id": "itme:p5:3",
+      "source_kind": "paper",
+      "title": "ITME: Inference Tiered Memory Expansion with Disaggregated CXL-Hybrid Memories",
+      "author_or_org": "Jang, H. et al. (SK hynix)",
+      "published_at": "2026-06-10",
+      "url_or_page": "[ITME p.5]",
+      "excerpt": "SSD, we effectively resolve this bandwidth mismatch. This balanced configuration enables the system to refill the DRAM cache at the same rate the host accesses it, consequently enabling highly effective hardware prefetching. Note that the marginal gap between the theoretical ideal bandwidth and our measured throughput is primarily attributed to the 3-stage metadata updating overhead discussed earlier. Ultimately, this design not only satisfies the metadata footprint constraints but also aligns the internal memory performance closely with the peak capabilities of the host interface (e.g., PCIe x8), facilitating consistent, high-speed data delivery. SSD Durability and Write Mitigation. Since CXL-hybrid memory integrates NAND flash, managing SSD durability is essential for long-term",
+      "doc_id": "itme"
+    },
+    {
+      "source_id": "itme:p8:6",
+      "source_kind": "paper",
+      "title": "ITME: Inference Tiered Memory Expansion with Disaggregated CXL-Hybrid Memories",
+      "author_or_org": "Jang, H. et al. (SK hynix)",
+      "published_at": "2026-06-10",
+      "url_or_page": "[ITME p.8]",
+      "excerpt": "implemented on an Intel Agilex 7 I-Series FPGA [3], validates the hardware-level control logic and the software prefetcher. This platform integrates 32 GB of DDR4 DRAM as a hardware-managed cache for two SK Hynix Platinum P51 PCIe Gen5 NVMe SSDs [37]. This setup establishes the feasibility of our expansion tier, successfully realizing a multi-terabyte, byte-addressable memory footprint by leveraging the cost-efficiency of NAND flash. Performance Potential Analysis via CMM. To evaluate the performance potential of the proposed architecture, we developed a production-grade empirical platform integrating an SK Hynix CMM [32] and two KIOXIA PCIe Gen5 NVMe SSDs [18]. To maintain architectural consistency with the FPGA prototype, we utilized 32 GB of the CMM capacity as the DRAM cache.",
+      "doc_id": "itme"
+    },
+    {
+      "source_id": "itme:p11:4",
+      "source_kind": "paper",
+      "title": "ITME: Inference Tiered Memory Expansion with Disaggregated CXL-Hybrid Memories",
+      "author_or_org": "Jang, H. et al. (SK hynix)",
+      "published_at": "2026-06-10",
+      "url_or_page": "[ITME p.11]",
+      "excerpt": "through global sharing and disaggregated architectures. Furthermore, PagedAttention [19], Pensieve [41], and CachedAttention [9] introduce advanced multi-tier cache management and memory paging for efficient context handling. Our proposed architecture, ITME, is designed to be fully compatible and synergistic with these existing software-level policies. Rather than replacing these stacks, ITME serves as a high-performance memory backend that integrates seamlessly with established tiering mechanisms. Furthermore, its internal hardware-level prefetching complements various scheduling policies, effectively hiding access latency by overlapping data movement with ongoing computation. This synergy allows ITME to maximize KV cache reuse and system efficiency within any established inference",
+      "doc_id": "itme"
+    }
+  ]
+}
