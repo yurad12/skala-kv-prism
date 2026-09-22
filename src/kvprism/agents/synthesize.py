@@ -27,6 +27,11 @@ def synthesize_node(state: GraphState, *, llm=None) -> dict:
     context["sources"] = [source.model_dump(mode="json") for source in state["sources"]]
     # 인용에 쓸 수 있는 ID. 목록 밖의 값은 검사에서 걸린다
     context["source_ids"] = [source.source_id for source in state["sources"]]
+    # TRL 근거로 쓸 수 있는 ID. 기술별 trl_signals에 기록된 것만 인정한다
+    context["trl_source_ids"] = {
+        tech.technology_id: sorted({signal.source_id for signal in _trl_signals(state, tech.technology_id)})
+        for tech in state["request"].technologies
+    }
     if llm is None:
         load_dotenv()
         # 설계서 2.4의 Generator 설정. 추론 모델이라 temperature 미지정

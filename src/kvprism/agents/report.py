@@ -4,12 +4,13 @@
 
 import json
 import os
+from collections.abc import Sequence
 from pathlib import Path
 
 from dotenv import load_dotenv
 from langchain_openai import ChatOpenAI
 
-from ..graph.state import GraphState, ReportResult, SynthesisResult
+from ..graph.state import GraphState, ReportResult, Source, SynthesisResult
 from ..tools.render_pdf import render_pdf
 from .report_rules import build_references, check_forbidden, cited_sources
 from .synthesize import INPUT_KEYS
@@ -80,6 +81,7 @@ def report_node(state: GraphState, *, llm=None, output_dir: str | Path = "output
 
     body = "\n\n".join(chapters)
     markdown = f"# SUMMARY\n\n{write('SUMMARY', SUMMARY_GUIDE, body)}\n\n{body}\n\n"
+    markdown = _page_tags(markdown, state["sources"])
     references = cited_sources(markdown, state["sources"])
     markdown += build_references(references) + "\n"
 
@@ -133,6 +135,14 @@ def _conflicts(synthesis: SynthesisResult) -> str:
         f"## 상충 지점 {number}: {item.title}\n\n{item.description}\n\n{_tags(item.source_ids)}"
         for number, item in enumerate(synthesis.conflicts, start=1)
     )
+
+
+def _page_tags(markdown: str, sources: Sequence[Source]) -> str:
+    """논문 청크 ID 인용을 [TQ p.7] 페이지 태그로 바꾼다."""
+    for source in sources:
+        if source.source_kind == "paper":
+            markdown = markdown.replace(f"[{source.source_id}]", source.url_or_page)
+    return markdown
 
 
 def _cell(text: str) -> str:

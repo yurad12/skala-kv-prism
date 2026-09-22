@@ -43,7 +43,8 @@ def cited_sources(text: str, sources: Sequence[Source]) -> list[Source]:
     by_tag: dict[str, Source] = {}
     for source in sources:
         by_tag.setdefault(source.source_id, source)
-        by_tag.setdefault(source.url_or_page, source)  # [TQ p.7] 형식의 페이지 태그
+        # [TQ p.7] 형식의 페이지 태그. 조회 키는 대괄호를 뺀 값이다
+        by_tag.setdefault(source.url_or_page.strip("[]"), source)
 
     used: dict[str, Source] = {}
     for tag in CITATION.findall(text):
@@ -58,8 +59,13 @@ def build_references(sources: Sequence[Source]) -> str:
     """REFERENCE 블록 생성. 과제 표기 형식을 출처 종류별로 적용."""
     papers = _paper_docs()
     lines = ["# REFERENCE", ""]
+    listed_docs: set[str] = set()
     for source in sources:
         if source.source_kind == "paper":
+            # 청크가 달라도 같은 논문이면 한 줄. 페이지는 본문 인용 태그가 가리킨다
+            if source.doc_id in listed_docs:
+                continue
+            listed_docs.add(source.doc_id or "")
             lines.append(_paper_line(source, papers.get(source.doc_id or "", {})))
         elif any(host in source.url_or_page for host in PATENT_HOSTS):
             lines.append(_patent_line(source))
@@ -102,7 +108,8 @@ def _patent_line(source: Source) -> str:
 
 
 def _plain(value: str) -> str:
-    return " ".join(value.split())
+    # 검색 결과 제목 끝에 붙는 말줄임표를 없앤다
+    return " ".join(value.split()).rstrip(". ").removesuffix("..").strip()
 
 
 def _is_quote(line: str, sources: Sequence[Source]) -> bool:
