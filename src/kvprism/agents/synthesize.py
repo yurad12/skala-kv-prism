@@ -78,17 +78,23 @@ def _limit_trl(estimate: TRLEstimate, state: GraphState, sources: dict[str, Sour
     if unlinked:
         raise ValueError(f"TRL 근거는 해당 기술의 trl_signals에 있어야 합니다: {unlinked}")
 
-    for label, field in (("논문 기술", "paper_trl"), ("기반 기술", "enabling_technology_trl")):
-        line = next(
-            (line for line in estimate.rationale.splitlines() if line.startswith(f"{label}:")),
-            None,
-        )
-        if line is None:
-            raise ValueError("rationale은 '논문 기술:'과 '기반 기술:' 두 줄로 작성합니다")
-        cited = set(CITATION.findall(line)) & set(estimate.source_ids)
+    parts = _split_rationale(estimate.rationale)
+    for part, field in zip(parts, ("paper_trl", "enabling_technology_trl")):
+        cited = set(CITATION.findall(part)) & set(estimate.source_ids)
         ceiling = _ceiling([signal for signal in signals if signal.source_id in cited], sources)
         if getattr(estimate, field) > ceiling:
             setattr(estimate, field, ceiling)
+
+
+def _split_rationale(rationale: str) -> tuple[str, str]:
+    """'논문 기술:'과 '기반 기술:' 구간 분리. 한 줄로 이어 써도 동작."""
+    paper = rationale.find("논문 기술:")
+    enabling = rationale.find("기반 기술:")
+    if paper < 0 or enabling < 0:
+        raise ValueError("rationale에는 '논문 기술:'과 '기반 기술:' 근거가 각각 필요합니다")
+    if paper < enabling:
+        return rationale[paper:enabling], rationale[enabling:]
+    return rationale[paper:], rationale[enabling:paper]
 
 
 def _trl_signals(state: GraphState, technology_id: str) -> list[EvidenceClaim]:
