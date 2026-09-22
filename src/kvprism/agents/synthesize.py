@@ -34,12 +34,17 @@ def synthesize_node(state: GraphState, *, llm=None) -> dict:
         load_dotenv()
         # 설계서 2.4의 Generator 설정. 추론 모델이라 temperature 미지정
         llm = ChatOpenAI(model=os.getenv("GENERATOR_MODEL") or "gpt-5.6-luna", reasoning_effort="medium")
-    response = llm.with_structured_output(SynthesisResult).invoke([
+    messages = [
         ("system", PROMPT.read_text(encoding="utf-8")),
         ("human", json.dumps(context, ensure_ascii=False)),
-    ])
-    result = SynthesisResult.model_validate(response)
-    return {"synthesis": validate_synthesis(result, state)}
+    ]
+    structured = llm.with_structured_output(SynthesisResult)
+    try:
+        return {"synthesis": validate_synthesis(SynthesisResult.model_validate(structured.invoke(messages)), state)}
+    except ValueError as error:
+        # 해시 ID 오타 같은 검증 실패는 오류 내용을 알려 한 번만 다시 생성
+        messages.append(("human", f"직전 결과가 검증에 실패했습니다: {error}\n입력에 있는 source_id를 그대로 복사해 다시 작성하세요."))
+    return {"synthesis": validate_synthesis(SynthesisResult.model_validate(structured.invoke(messages)), state)}
 
 
 def validate_synthesis(result: SynthesisResult, state: GraphState) -> SynthesisResult:
