@@ -171,7 +171,7 @@ flowchart TD
 ## Usage
 
 ```bash
-uv sync --extra dev        # .venv 생성 + uv.lock 기준으로 동일 환경 설치
+uv sync                    # .venv 생성 + uv.lock 기준으로 동일 환경 설치 (pytest 포함)
 cp .env.example .env       # OPENAI_API_KEY, TAVILY_API_KEY, 모델 이름 입력
 uv run python scripts/download_papers.py   # 논문 PDF 2편 내려받기 (--all: 벤치마크용 6편까지)
 uv run python app.py       # 전체 그래프 실행 → PDF 생성 (인덱스가 없으면 먼저 만듭니다)
