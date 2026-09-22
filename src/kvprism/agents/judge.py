@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 from collections.abc import Callable
+from concurrent.futures import ThreadPoolExecutor
 
 from dotenv import load_dotenv
 from langchain_openai import ChatOpenAI
@@ -106,7 +107,16 @@ def _judge_perspective(
         )
 
     invalid_citations: list[str] = []
-    support_cache: dict[tuple[str, str], bool] = {}
+    # 주장별 판정은 서로 독립이라 병렬 호출. 판정 단위와 결과는 순차 호출과 같다
+    pending = {
+        (claim.statement, claim.source_id): (claim, sources[claim.source_id])
+        for evaluation in result.evaluations
+        for claim in _evidence_claims(evaluation)
+        if claim.source_id in sources
+    }
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        verdicts = pool.map(lambda pair: supports(*pair), pending.values())
+        support_cache = dict(zip(pending, verdicts))
     for evaluation in result.evaluations:
         for claim in _cited_claims(evaluation):
             source = sources.get(claim.source_id)
@@ -114,15 +124,10 @@ def _judge_perspective(
             if source is None:
                 invalid_citations.append(f"{label}(미등록 출처)")
         for claim in _evidence_claims(evaluation):
-            source = sources.get(claim.source_id)
-            if source is None:
+            if claim.source_id not in sources:
                 continue
             label = f"{evaluation.technology_id}/{claim.source_id}"
-            cache_key = (claim.statement, claim.source_id)
-            if cache_key not in support_cache:
-                support_cache[cache_key] = supports(claim, source)
-            supported = support_cache[cache_key]
-            if not supported:
+            if not support_cache[(claim.statement, claim.source_id)]:
                 invalid_citations.append(f"{label}(발췌문 근거 불충분)")
 
     citations_ok = not invalid_citations
