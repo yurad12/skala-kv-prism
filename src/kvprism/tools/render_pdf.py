@@ -27,7 +27,8 @@ def render_pdf(report_md: str, output_path: str | Path = "outputs/RAG-Output.pdf
     pdf.m_d.disable("html_block").disable("html_inline").disable("image")
 
     page = pymupdf.paper_rect("a4")
-    summary = report_md.split("\n# ", 1)[0]
+    # 보고서 제목 뒤 SUMMARY 장만 잘라 분량 검사
+    summary = ("# SUMMARY" + report_md.split("# SUMMARY", 1)[-1]).split("\n# ", 1)[0]
     story = pymupdf.Story(html=pdf.m_d.render(summary), user_css=REPORT_CSS)
     overflow, _ = story.place(pymupdf.Rect(MARGIN, MARGIN, page.width - MARGIN, page.height / 2))
     if overflow:
