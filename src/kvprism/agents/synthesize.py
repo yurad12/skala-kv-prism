@@ -25,6 +25,11 @@ def synthesize_node(state: GraphState, *, llm=None) -> dict:
     """담당 키 synthesis만 반환."""
     context = {key: state[key].model_dump(mode="json") for key in INPUT_KEYS}
     context["sources"] = [source.model_dump(mode="json") for source in state["sources"]]
+    # TRL 근거로 쓸 수 있는 source_id를 기술별로 명시 (프롬프트 입력용, State 불변)
+    context["trl_signal_ids"] = {
+        tech.technology_id: sorted({s.source_id for s in _trl_signals(state, tech.technology_id)})
+        for tech in state["request"].technologies
+    }
     if llm is None:
         load_dotenv()
         # 설계서 2.4의 Generator 설정. 추론 모델이라 temperature 미지정
@@ -74,9 +79,12 @@ def validate_synthesis(result: SynthesisResult, state: GraphState) -> SynthesisR
 def _limit_trl(estimate: TRLEstimate, state: GraphState, sources: dict[str, Source]) -> None:
     """rationale의 근거 범위로 논문 기술·기반 기술 단계 제한."""
     signals = _trl_signals(state, estimate.technology_id)
-    unlinked = sorted(set(estimate.source_ids) - {signal.source_id for signal in signals})
-    if unlinked:
-        raise ValueError(f"TRL 근거는 해당 기술의 trl_signals에 있어야 합니다: {unlinked}")
+    signal_ids = {signal.source_id for signal in signals}
+    # trl_signals 밖 출처는 TRL 근거에서 제외. 상한 계산에도 쓰이지 않아 단계가 올라가지 않는다
+    linked = [source_id for source_id in estimate.source_ids if source_id in signal_ids]
+    if not linked:
+        raise ValueError(f"TRL 근거는 해당 기술의 trl_signals에 있어야 합니다: {estimate.source_ids}")
+    estimate.source_ids = linked
 
     parts = _split_rationale(estimate.rationale)
     for part, field in zip(parts, ("paper_trl", "enabling_technology_trl")):
