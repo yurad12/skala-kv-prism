@@ -54,7 +54,8 @@ def evaluate_perspective_node(
     state: GraphState,
     perspective: Perspective,
     system_prompt: str,
-    query_fn: Callable[[str, str, str], list[str]],
+    query_fn: Any,
+    extra_sources: list[Source] | None = None,
     use_domain_context: bool = False,
 ) -> dict:
     req = state["request"]
@@ -71,6 +72,12 @@ def evaluate_perspective_node(
 
     # 2. 웹 검색 및 출처 수집 (딕셔너리로 source_id 중복 즉시 차단)
     sources_by_id: dict[str, Source] = {}
+
+    # 전달받은 외부 출처(domain 노드의 RAG 청크 등)가 있으면 먼저 등록
+    if extra_sources:
+        for s in extra_sources:
+            sources_by_id[s.source_id] = s
+            
     tech_contexts: list[str] = []
 
     for tech in req.technologies:

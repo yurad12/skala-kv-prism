@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from ..graph.state import GraphState
+from ..graph.state import GraphState, Source
+from ..tools.rag_retrieve import rag_retrieve
 from .common import evaluate_perspective_node
 
 DOMAIN_SYSTEM_PROMPT = """당신은 LLM 인프라 배포 환경 및 도메인 적용성 분석 전문가입니다.
@@ -38,11 +39,27 @@ def _get_domain_queries(tech_name: str, domain: str, scenario: str) -> list[str]
 
 
 def domain_node(state: GraphState) -> dict:
-    """도메인 적용 관점 평가를 수행하고 domain_eval과 신규 출처를 반환합니다."""
+    """도메인 평가 노드: 논문 RAG 청크를 검색해 웹 검색 결과와 함께 평가합니다."""
+    # 1. 도메인 평가에 필요한 논문 실험 조건 RAG 검색
+    rag_sources: list[Source] = []
+    for tech in state.get("selected_techs", []):
+        doc_id = getattr(tech, "paper_doc_id", tech.technology_id)
+        queries = [
+            f"{tech.name} experimental setup hardware GPU memory batch size",
+            f"{tech.name} throughput latency serving benchmark",
+        ]
+        for q in queries:
+            try:
+                rag_sources.extend(rag_retrieve(doc_id=doc_id, query=q, k=2))
+            except Exception:
+                pass
+
+    # 2. 웹 검색 및 LLM 평가는 기존 common 함수에 위임 (extra_sources로 RAG 청크 전달)
     return evaluate_perspective_node(
         state=state,
         perspective="domain",
         system_prompt=DOMAIN_SYSTEM_PROMPT,
         query_fn=_get_domain_queries,
+        extra_sources=rag_sources,
         use_domain_context=True,
     )
