@@ -76,8 +76,8 @@ def _make_source_id(url: str, excerpt: str) -> str:
     return f"web_{hashlib.sha256(value.encode('utf-8')).hexdigest()[:12]}"
 
 
-def _parse_published_date(date_str: str | None) -> str | None:
-    """Tavily 날짜 문자열을 YYYY-MM-DD 포맷으로 정제합니다."""
+def _parse_published_date(raw_date: str | None, url: str = "") -> str | None:
+    """Tavily 날짜 문자열을 YYYY-MM-DD 포맷으로 정제합니다. 없으면 URL 경로에서 찾습니다."""
     if raw_date and isinstance(raw_date, str):
         # 1. RFC 2822 형식 (예: "Wed, 02 Oct 2002 13:00:00 GMT")
         try:
@@ -146,7 +146,7 @@ def web_search(query: str, max_results: int = 5, topic:str="general") -> list[So
         excerpt = item.get("content", "").strip() or title
         source_id = _make_source_id(raw_url, excerpt)
         author_or_org = domain.split(".")[0].capitalize() if domain else "Web"
-        published_at = _parse_published_date(item.get("published_date"))
+        published_at = _parse_published_date(item.get("published_date"), raw_url)
 
         data = {
             "source_id": source_id,

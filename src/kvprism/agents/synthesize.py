@@ -22,19 +22,31 @@ PENDING_WORDS = ("제안", "않", "못", "예정", "계획", "미정")
 
 
 def synthesize_node(state: GraphState, *, llm=None) -> dict:
-    """담당 키 synthesis만 반환."""
+    """담당 키 synthesis만 반환. 검사에 걸리면 한 번 다시 요청."""
     context = {key: state[key].model_dump(mode="json") for key in INPUT_KEYS}
     context["sources"] = [source.model_dump(mode="json") for source in state["sources"]]
+    # 인용에 쓸 수 있는 ID. 목록 밖의 값은 검사에서 걸린다
+    context["source_ids"] = [source.source_id for source in state["sources"]]
     if llm is None:
         load_dotenv()
         # 설계서 2.4의 Generator 설정. 추론 모델이라 temperature 미지정
         llm = ChatOpenAI(model=os.getenv("GENERATOR_MODEL") or "gpt-5.6-luna", reasoning_effort="medium")
-    response = llm.with_structured_output(SynthesisResult).invoke([
+
+    model = llm.with_structured_output(SynthesisResult)
+    messages = [
         ("system", PROMPT.read_text(encoding="utf-8")),
         ("human", json.dumps(context, ensure_ascii=False)),
-    ])
-    result = SynthesisResult.model_validate(response)
-    return {"synthesis": validate_synthesis(result, state)}
+    ]
+    for retried in (False, True):
+        result = SynthesisResult.model_validate(model.invoke(messages))
+        try:
+            return {"synthesis": validate_synthesis(result, state)}
+        except ValueError as error:
+            if retried:
+                raise
+            messages.append(
+                ("human", f"직전 출력의 문제: {error}. source_ids 목록의 값을 글자 그대로 옮겨 다시 작성한다.")
+            )
 
 
 def validate_synthesis(result: SynthesisResult, state: GraphState) -> SynthesisResult:
