@@ -7,7 +7,6 @@
 
 from __future__ import annotations
 
-import operator
 from datetime import date
 from pathlib import Path
 from typing import Annotated, Literal, TypedDict
@@ -98,6 +97,37 @@ class Source(StrictModel):
         description="논문 문서 식별자. 웹 출처일 때는 생략",
     )
 
+    @model_validator(mode="after")
+    def require_doc_id_for_paper(self) -> "Source":
+        if self.source_kind == "paper" and not self.doc_id:
+            raise ValueError("논문 출처에는 doc_id가 필요합니다")
+        if self.source_kind == "web" and self.doc_id is not None:
+            raise ValueError("웹 출처에는 doc_id를 지정하지 않습니다")
+        return self
+
+
+def merge_sources(
+    current: list[Source] | None,
+    incoming: list[Source] | None,
+) -> list[Source]:
+    """병렬 실행과 재실행에서 출처를 식별자 기준으로 안전하게 합친다.
+
+    같은 ``source_id``와 같은 내용이 다시 들어오면 한 건만 남긴다. 같은
+    식별자에 서로 다른 내용이 들어오면 인용이 모호해지므로 즉시 실패한다.
+    """
+
+    merged: dict[str, Source] = {}
+    for source in [*(current or []), *(incoming or [])]:
+        validated = source if isinstance(source, Source) else Source.model_validate(source)
+        existing = merged.get(validated.source_id)
+        if existing is not None and existing != validated:
+            raise ValueError(
+                f"동일한 source_id에 서로 다른 출처 내용이 있습니다: "
+                f"{validated.source_id}"
+            )
+        merged[validated.source_id] = validated
+    return list(merged.values())
+
 
 class EvidenceClaim(StrictModel):
     """등록된 출처 한 건으로 역추적할 수 있는 주장."""
@@ -118,9 +148,9 @@ class TechnologyResearch(StrictModel):
     technology_id: str = Field(min_length=1)
     overview: str = Field(min_length=1)
     mechanism: list[EvidenceClaim] = Field(default_factory=list)
-    performance: list[EvidenceClaim] = Field(default_factory=list)
-    experimental_conditions: list[EvidenceClaim] = Field(default_factory=list)
-    limitations: list[EvidenceClaim] = Field(default_factory=list)
+    performance_metrics: list[EvidenceClaim] = Field(min_length=1)
+    experimental_conditions: list[EvidenceClaim] = Field(min_length=1)
+    limitations: list[EvidenceClaim] = Field(min_length=1)
     trl_signals: list[EvidenceClaim] = Field(default_factory=list)
 
 
@@ -160,6 +190,9 @@ class TechnologyEvaluation(StrictModel):
         for item in self.negative_evidence:
             if item.stance != "negative":
                 raise ValueError("negative_evidence 항목의 stance는 negative여야 합니다")
+        for item in self.neutral_evidence:
+            if item.stance != "neutral":
+                raise ValueError("neutral_evidence 항목의 stance는 neutral이어야 합니다")
         return self
 
 
@@ -182,18 +215,43 @@ class PerspectiveResult(StrictModel):
 # ---------------------------------------------------------------------------
 
 
+class JudgeChecks(StrictModel):
+    """설계서와 README에서 요구한 관점별 검증 항목."""
+
+    evidence_balance_ok: bool
+    citations_ok: bool
+    trl_basis_ok: bool
+
+    @property
+    def passed(self) -> bool:
+        return all(
+            (
+                self.evidence_balance_ok,
+                self.citations_ok,
+                self.trl_basis_ok,
+            )
+        )
+
+
 class PerspectiveJudgment(StrictModel):
     """관점 하나에 대한 검증 결과와 재실행용 보완 지시."""
 
     perspective: Perspective
     passed: bool
+    checks: JudgeChecks
     issues: list[str] = Field(default_factory=list)
     retry_instruction: str | None = None
 
     @model_validator(mode="after")
     def require_retry_instruction_on_failure(self) -> "PerspectiveJudgment":
+        if self.passed != self.checks.passed:
+            raise ValueError("passed 값은 checks의 전체 통과 여부와 같아야 합니다")
         if not self.passed and not self.retry_instruction:
             raise ValueError("검증 실패 시 retry_instruction이 필요합니다")
+        if not self.passed and not self.issues:
+            raise ValueError("검증 실패 시 issues가 한 건 이상 필요합니다")
+        if self.passed and self.retry_instruction is not None:
+            raise ValueError("검증 통과 시 retry_instruction을 지정하지 않습니다")
         return self
 
 
@@ -257,13 +315,37 @@ class SynthesisResult(StrictModel):
     conflicts: list[ConflictPoint] = Field(min_length=2)
     neutral_summary: str = Field(min_length=1)
 
+    @model_validator(mode="after")
+    def require_complete_technology_perspective_matrix(self) -> "SynthesisResult":
+        technology_ids = [item.technology_id for item in self.trl_estimates]
+        if len(set(technology_ids)) != 2:
+            raise ValueError("TRL 추정은 서로 다른 두 기술을 대상으로 해야 합니다")
+
+        actual_cells = {
+            (item.technology_id, item.perspective) for item in self.matrix
+        }
+        expected_cells = {
+            (technology_id, perspective)
+            for technology_id in technology_ids
+            for perspective in ("market", "stakeholder", "domain")
+        }
+        if actual_cells != expected_cells or len(actual_cells) != len(self.matrix):
+            raise ValueError("matrix는 두 기술 × 세 관점의 6개 조합을 한 번씩 포함해야 합니다")
+        return self
+
 
 class ReportResult(StrictModel):
     """최종 보고서 경로와 보고서에서 사용한 인용 목록."""
 
     markdown_path: Path
     pdf_path: Path
-    reference_source_ids: list[str]
+    reference_source_ids: list[str] = Field(min_length=1)
+
+    @model_validator(mode="after")
+    def require_unique_reference_ids(self) -> "ReportResult":
+        if len(self.reference_source_ids) != len(set(self.reference_source_ids)):
+            raise ValueError("REFERENCE의 source_id는 중복될 수 없습니다")
+        return self
 
 
 class PipelineOutput(StrictModel):
@@ -308,7 +390,7 @@ class GraphState(TypedDict, total=False):
     retry_targets: list[Perspective]
     synthesis: SynthesisResult
     report: ReportResult
-    sources: Annotated[list[Source], operator.add]
+    sources: Annotated[list[Source], merge_sources]
 
 
 def initial_state(request: PipelineInput) -> GraphState:
@@ -322,12 +404,127 @@ def initial_state(request: PipelineInput) -> GraphState:
     }
 
 
+def _collect_evidence_claims(state: GraphState) -> list[EvidenceClaim]:
+    """현재 상태의 기술 조사와 관점별 평가에서 모든 근거 주장을 모은다."""
+
+    claims: list[EvidenceClaim] = []
+    research = state.get("research")
+    if research is not None:
+        for technology in research.technologies:
+            claims.extend(technology.mechanism)
+            claims.extend(technology.performance_metrics)
+            claims.extend(technology.experimental_conditions)
+            claims.extend(technology.limitations)
+            claims.extend(technology.trl_signals)
+
+    for key in ("market_eval", "stakeholder_eval", "domain_eval"):
+        result = state.get(key)
+        if result is None:
+            continue
+        for evaluation in result.evaluations:
+            claims.extend(evaluation.positive_evidence)
+            claims.extend(evaluation.negative_evidence)
+            claims.extend(evaluation.neutral_evidence)
+            claims.extend(evaluation.trl_signals)
+    return claims
+
+
+def validate_graph_state(state: GraphState) -> None:
+    """노드 간 기술 식별자와 인용 연결이 일관적인지 검사한다."""
+
+    request = state.get("request")
+    if request is None:
+        raise ValueError("그래프 상태에 request가 없습니다")
+    expected_ids = {item.technology_id for item in request.technologies}
+
+    research = state.get("research")
+    if research is not None:
+        actual_ids = {item.technology_id for item in research.technologies}
+        if actual_ids != expected_ids:
+            raise ValueError("기술 조사 결과의 기술 목록이 입력과 다릅니다")
+
+    perspective_keys = {
+        "market_eval": "market",
+        "stakeholder_eval": "stakeholder",
+        "domain_eval": "domain",
+    }
+    for key, expected_perspective in perspective_keys.items():
+        result = state.get(key)
+        if result is None:
+            continue
+        if result.perspective != expected_perspective:
+            raise ValueError(f"{key}의 perspective 값이 올바르지 않습니다")
+        actual_ids = {item.technology_id for item in result.evaluations}
+        if actual_ids != expected_ids:
+            raise ValueError(f"{key}의 기술 목록이 입력과 다릅니다")
+
+    synthesis = state.get("synthesis")
+    if synthesis is not None:
+        synthesis_ids = {item.technology_id for item in synthesis.trl_estimates}
+        if synthesis_ids != expected_ids:
+            raise ValueError("종합 결과의 기술 목록이 입력과 다릅니다")
+
+    sources = state.get("sources", [])
+    source_by_id = {source.source_id: source for source in sources}
+    if len(source_by_id) != len(sources):
+        raise ValueError("sources의 source_id는 서로 달라야 합니다")
+
+    for claim in _collect_evidence_claims(state):
+        source = source_by_id.get(claim.source_id)
+        if source is None:
+            raise ValueError(
+                f"근거 주장이 등록되지 않은 source_id를 참조합니다: {claim.source_id}"
+            )
+
+    if synthesis is not None:
+        synthesis_source_ids: set[str] = set()
+        for estimate in synthesis.trl_estimates:
+            synthesis_source_ids.update(estimate.source_ids)
+        for cell in synthesis.matrix:
+            synthesis_source_ids.update(cell.source_ids)
+        for conflict in synthesis.conflicts:
+            synthesis_source_ids.update(conflict.source_ids)
+        missing_synthesis_sources = synthesis_source_ids - set(source_by_id)
+        if missing_synthesis_sources:
+            raise ValueError(
+                "종합 결과가 등록되지 않은 source_id를 참조합니다: "
+                f"{sorted(missing_synthesis_sources)}"
+            )
+
+    judge = state.get("judge")
+    report = state.get("report")
+
+    retry_count = state.get("retry_count")
+    retry_targets = state.get("retry_targets")
+    if retry_count is not None and retry_count not in (0, 1):
+        raise ValueError("retry_count는 0 또는 1이어야 합니다")
+    if judge is not None and retry_targets is not None:
+        if set(retry_targets) != set(judge.failed_perspectives):
+            raise ValueError("retry_targets가 Judge의 미달 관점과 일치하지 않습니다")
+        if not judge.passed and retry_count == 0 and report is not None:
+            raise ValueError("검증 미달 상태에서는 재실행 후에만 보고서를 생성할 수 있습니다")
+
+
 def validate_pipeline_output(state: GraphState) -> PipelineOutput:
     """그래프 종료 상태에 필수 출력이 모두 있는지 검사한다."""
 
-    missing = [key for key in ("report", "synthesis", "sources") if key not in state]
+    required_keys = (
+        "request",
+        "research",
+        "market_eval",
+        "stakeholder_eval",
+        "domain_eval",
+        "judge",
+        "retry_count",
+        "retry_targets",
+        "synthesis",
+        "report",
+        "sources",
+    )
+    missing = [key for key in required_keys if key not in state]
     if missing:
         raise ValueError(f"그래프 출력에 필수 필드가 없습니다: {', '.join(missing)}")
+    validate_graph_state(state)
     return PipelineOutput(
         report=state["report"],
         synthesis=state["synthesis"],
