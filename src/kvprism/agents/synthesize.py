@@ -3,11 +3,16 @@
 """
 
 import json
+import os
+from pathlib import Path
+
+from dotenv import load_dotenv
+from langchain_openai import ChatOpenAI
 
 from ..graph.state import EvidenceClaim, GraphState, Source, SynthesisResult, TRLEstimate
-from .generation import create_generator, read_prompt
 from .report_rules import CITATION, check_forbidden, cited_sources
 
+PROMPT = Path(__file__).resolve().parents[1] / "prompts" / "synthesize.md"
 PERSPECTIVES = ("market", "stakeholder", "domain")
 # 두 노드가 프롬프트에 넣는 State 키
 INPUT_KEYS = ("request", "research", "market_eval", "stakeholder_eval", "domain_eval", "judge")
@@ -20,9 +25,12 @@ def synthesize_node(state: GraphState, *, llm=None) -> dict:
     """담당 키 synthesis만 반환."""
     context = {key: state[key].model_dump(mode="json") for key in INPUT_KEYS}
     context["sources"] = [source.model_dump(mode="json") for source in state["sources"]]
-    model = llm if llm is not None else create_generator()
-    response = model.with_structured_output(SynthesisResult).invoke([
-        ("system", read_prompt("synthesize.md")),
+    if llm is None:
+        load_dotenv()
+        # 설계서 2.4의 Generator 설정. 추론 모델이라 temperature 미지정
+        llm = ChatOpenAI(model=os.getenv("GENERATOR_MODEL") or "gpt-5.6-luna", reasoning_effort="medium")
+    response = llm.with_structured_output(SynthesisResult).invoke([
+        ("system", PROMPT.read_text(encoding="utf-8")),
         ("human", json.dumps(context, ensure_ascii=False)),
     ])
     result = SynthesisResult.model_validate(response)

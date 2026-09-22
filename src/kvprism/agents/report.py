@@ -3,14 +3,18 @@
 """
 
 import json
+import os
 from pathlib import Path
+
+from dotenv import load_dotenv
+from langchain_openai import ChatOpenAI
 
 from ..graph.state import GraphState, ReportResult, SynthesisResult
 from ..tools.render_pdf import render_pdf
-from .generation import create_generator, read_prompt
 from .report_rules import build_references, check_forbidden, cited_sources
 from .synthesize import INPUT_KEYS
 
+PROMPT = Path(__file__).resolve().parents[1] / "prompts" / "report.md"
 PERSPECTIVE_LABELS = {"market": "시장성", "stakeholder": "이해관계자", "domain": "도메인 적용"}
 
 # 설계서 5장 목차와 장별 작성 지침. 분량은 상한
@@ -35,12 +39,15 @@ def report_node(state: GraphState, *, llm=None, output_dir: str | Path = "output
     names = {tech.technology_id: tech.name for tech in state["request"].technologies}
     context = {key: state[key].model_dump(mode="json") for key in (*INPUT_KEYS, "synthesis")}
     context["sources"] = [source.model_dump(mode="json") for source in state["sources"]]
-    model = llm if llm is not None else create_generator()
-    prompt = read_prompt("report.md")
+    if llm is None:
+        load_dotenv()
+        # 설계서 2.4의 Generator 설정. 추론 모델이라 temperature 미지정
+        llm = ChatOpenAI(model=os.getenv("GENERATOR_MODEL") or "gpt-5.6-luna", reasoning_effort="medium")
+    prompt = PROMPT.read_text(encoding="utf-8")
 
     def write(chapter: str, guide: str, body: str = "") -> str:
         request = {"chapter": chapter, "guide": guide, "context": context, "body": body}
-        response = model.invoke([
+        response = llm.invoke([
             ("system", prompt),
             ("human", json.dumps(request, ensure_ascii=False)),
         ])
