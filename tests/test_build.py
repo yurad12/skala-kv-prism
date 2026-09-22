@@ -5,6 +5,7 @@ from __future__ import annotations
 import unittest
 from collections import Counter
 from collections.abc import Iterable
+from unittest.mock import patch
 
 from kvprism.graph.build import GraphNodes, build_graph
 from kvprism.graph.state import (
@@ -108,7 +109,8 @@ class GraphBuildTests(unittest.TestCase):
     def test_only_failed_perspective_runs_again(self) -> None:
         graph, calls = make_test_graph([{"market"}, set()])
 
-        result = graph.invoke(initial_test_state())
+        with patch("kvprism.graph.build.log.warning") as warning:
+            result = graph.invoke(initial_test_state())
 
         self.assertEqual(calls["market"], 2)
         self.assertEqual(calls["stakeholder"], 1)
@@ -118,6 +120,7 @@ class GraphBuildTests(unittest.TestCase):
         self.assertEqual(calls["report"], 1)
         self.assertEqual(result["retry_count"], 1)
         self.assertEqual(result["retry_targets"], [])
+        warning.assert_not_called()
 
     def test_graph_stops_retrying_after_one_retry(self) -> None:
         graph, calls = make_test_graph(
@@ -127,7 +130,8 @@ class GraphBuildTests(unittest.TestCase):
             ]
         )
 
-        result = graph.invoke(initial_test_state())
+        with patch("kvprism.graph.build.log.warning") as warning:
+            result = graph.invoke(initial_test_state())
 
         self.assertEqual(calls["market"], 2)
         self.assertEqual(calls["stakeholder"], 2)
@@ -137,6 +141,8 @@ class GraphBuildTests(unittest.TestCase):
         self.assertEqual(calls["report"], 1)
         self.assertEqual(result["retry_count"], 1)
         self.assertEqual(result["retry_targets"], ["market"])
+        warning.assert_called_once()
+        self.assertIn("market: 긍정·부정 근거가 부족합니다", warning.call_args.args[1])
 
 
 if __name__ == "__main__":
