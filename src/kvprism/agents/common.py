@@ -56,6 +56,7 @@ def evaluate_perspective_node(
     system_prompt: str,
     query_fn: Callable[[str, str, str], list[str]],
     use_domain_context: bool = False,
+    research_fields: tuple[str, ...] = (),
 ) -> dict:
     req = state["request"]
     domain = req.domain if use_domain_context else ""
@@ -74,16 +75,22 @@ def evaluate_perspective_node(
     tech_contexts: list[str] = []
 
     for tech in req.technologies:
+        research_text = _format_research(state, tech.technology_id, research_fields)
+        tech_source_ids: list[str] = []
         for q in query_fn(tech.name, domain, scenario):
             for s in web_search(query=q, max_results=2):
                 sources_by_id[s.source_id] = s
+                if s.source_id not in tech_source_ids:
+                    tech_source_ids.append(s.source_id)
 
         sources_text = "\n".join(
             f"- [{s.source_id}] ({s.author_or_org}) {s.title}: {s.excerpt}"
-            for s in sources_by_id.values()
+            for source_id in tech_source_ids
+            for s in [sources_by_id[source_id]]
         )
         tech_contexts.append(
             f"### 기술: {tech.name} (ID: {tech.technology_id}, 구분: {tech.kind})\n"
+            f"논문 기술 조사:\n{research_text}\n"
             f"참조 출처:\n{sources_text if sources_text else '(수집된 웹 출처 없음)'}"
         )
 
@@ -132,3 +139,32 @@ def evaluate_perspective_node(
         f"{perspective}_eval": PerspectiveResult(perspective=perspective, evaluations=evaluations[:2]),
         "sources": list(sources_by_id.values()),
     }
+
+
+def _format_research(
+    state: GraphState,
+    technology_id: str,
+    fields: tuple[str, ...],
+) -> str:
+    """관점 평가에 필요한 기술 조사 항목만 인용 식별자와 함께 정리한다."""
+
+    research = state.get("research")
+    if research is None:
+        raise ValueError("관점별 평가에 research 결과가 필요합니다")
+    profile = next(
+        (item for item in research.technologies if item.technology_id == technology_id),
+        None,
+    )
+    if profile is None:
+        raise ValueError(f"research에 기술 조사 결과가 없습니다: {technology_id}")
+
+    lines: list[str] = []
+    for field in fields:
+        value = getattr(profile, field)
+        if isinstance(value, str):
+            lines.append(f"- {field}: {value}")
+            continue
+        lines.extend(
+            f"- {field}: {claim.statement} [{claim.source_id}]" for claim in value
+        )
+    return "\n".join(lines) or "(사용할 기술 조사 항목 없음)"
