@@ -25,6 +25,12 @@ REQUIRED_FIELDS = ("performance_metrics", "experimental_conditions", "limitation
 CACHE_DIR = ROOT / "outputs" / "cache" / "research"
 
 
+class SearchQueries(BaseModel):
+    """LLM 이 쓴 영어 검색 질의 목록. 항목 순서대로 2개씩."""
+
+    queries: list[str]
+
+
 class RelevanceVerdict(BaseModel):
     """관련성 판정 결과. 부족하면 고친 영어 질의를 함께 돌려준다."""
 
@@ -63,14 +69,28 @@ def format_context(sources: list[Source]) -> str:
 
 
 # ---------------------------------------------------------------------------
-# 1) 검색: 항목별로 검색하고, 부족하면 질의를 한 번 고쳐 다시 검색
+# 1) 검색: LLM 이 항목별 영어 질의를 쓰고, 검색 결과가 부족하면 질의를 한 번 고쳐 다시 검색
 # ---------------------------------------------------------------------------
+
+QUERIES_PER_ASPECT = 2
+
+
+def write_queries(tech: Technology, ask) -> dict[str, list[str]]:
+    """한국어 조사 항목을 보고 LLM 이 항목마다 영어 질의 2개를 쓴다 (설계서 2.2.2: 에이전트가 질의를 영어로 쓴다)."""
+    aspects = list(P.ASPECT_QUESTIONS_KO)
+    items = "\n".join(f"{i}. {P.ASPECT_QUESTIONS_KO[a]}" for i, a in enumerate(aspects, start=1))
+    result = ask(SearchQueries, P.QUERY_SYSTEM, P.QUERY_USER.format(
+        title=tech.paper_title, name=tech.name, n=len(aspects) * QUERIES_PER_ASPECT, items=items))
+    queries = result.queries[: len(aspects) * QUERIES_PER_ASPECT]
+    by_aspect = {a: queries[i * QUERIES_PER_ASPECT:(i + 1) * QUERIES_PER_ASPECT] for i, a in enumerate(aspects)}
+    for a in aspects:  # LLM 이 개수를 못 맞추면 항목 이름을 넣은 기본 질의로 채운다
+        by_aspect[a] = by_aspect[a] or [f"{tech.name} {a.replace('_', ' ')}"]
+    return by_aspect
 
 
 def collect_sources(tech: Technology, retrieve, ask, k: int | None = None) -> dict[str, Source]:
     found: dict[str, Source] = {}  # source_id → Source
-    for aspect, templates in P.ASPECT_QUERIES.items():
-        queries = [t.format(name=tech.name) for t in templates]
+    for aspect, queries in write_queries(tech, ask).items():
         aspect_sources: dict[str, Source] = {}
         for query in queries:
             for s in retrieve(tech.paper_doc_id, query, k):
