@@ -36,7 +36,6 @@ def _get_stakeholder_queries(tech_name: str, domain: str, scenario: str) -> list
         f"{tech_name} hardware investment analyst TCO evaluation",
     ]
 
-
 def stakeholder_node(state: GraphState) -> dict:
     """이해관계자 관점 평가를 수행하고 stakeholder_eval과 신규 출처를 반환합니다."""
     return evaluate_perspective_node(
