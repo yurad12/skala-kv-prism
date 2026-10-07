@@ -1,0 +1,5 @@
+Source: https://github.com/orioncactus/pretendard
+License: SIL Open Font License 1.1 (OFL.txt)
+These fonts are derived from Pretendard Variable at weights 400 and 700.
+GSUB substitutions are removed to preserve PDF text extraction for punctuation.
+The modified font family is renamed KV Prism Sans under the reserved-name requirement.
