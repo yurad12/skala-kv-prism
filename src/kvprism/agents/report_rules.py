@@ -59,14 +59,15 @@ def build_references(sources: Sequence[Source]) -> str:
     """REFERENCE 블록 생성. 과제 표기 형식을 출처 종류별로 적용."""
     papers = _paper_docs()
     lines = ["# REFERENCE", ""]
-    listed_docs: set[str] = set()
+    listed_pages: set[tuple[str | None, str]] = set()
     listed_urls: set[str] = set()
     for source in sources:
         if source.source_kind == "paper":
-            # 청크가 달라도 같은 논문이면 한 줄. 페이지는 본문 인용 태그가 가리킨다
-            if source.doc_id in listed_docs:
+            # 본문에서 인용한 페이지마다 서지를 남기고, 같은 페이지의 청크만 합친다.
+            page_key = (source.doc_id, source.url_or_page)
+            if page_key in listed_pages:
                 continue
-            listed_docs.add(source.doc_id or "")
+            listed_pages.add(page_key)
             lines.append(_paper_line(source, papers.get(source.doc_id or "", {})))
         elif source.url_or_page in listed_urls:
             continue
@@ -93,8 +94,8 @@ def _paper_line(source: Source, meta: dict) -> str:
     year = str(meta.get("published") or source.published_at or "")[:4] or "연도 미상"
     title = _plain(meta.get("title") or source.title)
     tail = f" *arXiv*, {meta['arxiv']}." if meta.get("arxiv") else f" {source.url_or_page}"
-    # 본문 페이지 태그([TQ p.7])와 같은 약칭([TQ])으로 표기
-    label = re.sub(r"\s*p\.\d+.*$", "", source.url_or_page.strip("[]")) or source.source_id
+    # 본문과 같은 페이지 태그를 사용해 인용 위치를 바로 확인할 수 있게 한다.
+    label = source.url_or_page.strip("[]") or source.source_id
     return f"- [{label}] {author} ({year}). {title}.{tail}"
 
 
