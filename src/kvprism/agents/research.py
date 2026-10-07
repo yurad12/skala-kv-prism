@@ -47,8 +47,8 @@ def make_ask(replay: bool = False):
     """ask(schema, system, user) 함수를 만든다. 결과는 파일에 저장하고 replay=True 면 저장된 것을 재사용한다."""
     from langchain_openai import ChatOpenAI
 
-    model = os.environ.get("GENERATOR_MODEL", "gpt-5.6-luna")
-    llm = ChatOpenAI(model=model, reasoning_effort="low")
+    model = os.environ.get("GENERATOR_MODEL") or "gpt-5.6-luna"
+    llm = ChatOpenAI(model=model, reasoning_effort="low", timeout=120, max_retries=1)
 
     def ask(schema: type[BaseModel], system: str, user: str) -> BaseModel:
         key = hashlib.sha256(f"{model}\n{schema.__name__}\n{system}\n{user}".encode()).hexdigest()[:24]
@@ -128,7 +128,7 @@ def numbers_in(text: str) -> set[float]:
 
 def validate_claims(profile: dict, tech: Technology, sources: dict[str, Source]) -> dict:
     """1) source_id 가 검색 결과에 없으면 버린다.
-    2) statement 의 숫자가 인용한 청크에 없으면, 숫자를 모두 담은 다른 검색 청크로 인용을 옮기고 없으면 버린다.
+    2) statement의 숫자가 인용한 청크에 없으면 제거한다. 숫자만 같은 다른 청크로 옮기지 않는다.
     """
     profile["technology_id"] = tech.technology_id
     profile["overview"] = re.sub(r"\s{2,}", " ", SOURCE_ID_RE.sub("", profile["overview"])).strip()
@@ -140,12 +140,8 @@ def validate_claims(profile: dict, tech: Technology, sources: dict[str, Source])
                 continue
             nums = numbers_in(claim["statement"])
             if nums and not nums <= numbers_in(sources[claim["source_id"]].excerpt):
-                alt = next((sid for sid, s in sources.items() if nums <= numbers_in(s.excerpt)), None)
-                if alt is None:
-                    log.warning("[%s] 발췌문에 없는 수치로 제거: %s", tech.technology_id, claim["statement"])
-                    continue
-                log.info("[%s] 인용 이동 %s → %s", tech.technology_id, claim["source_id"], alt)
-                claim["source_id"] = alt
+                log.warning("[%s] 인용한 발췌문에 없는 수치로 제거: %s", tech.technology_id, claim["statement"])
+                continue
             kept.append(claim)
         profile[field] = kept
     return profile
@@ -156,9 +152,13 @@ def validate_claims(profile: dict, tech: Technology, sources: dict[str, Source])
 # ---------------------------------------------------------------------------
 
 
-def extract_profile(tech: Technology, sources: dict[str, Source], ask) -> TechnologyResearch:
+def extract_profile(tech: Technology, sources: dict[str, Source], ask, *, instruction="", previous=None) -> TechnologyResearch:
     user = P.EXTRACT_USER.format(name=tech.name, technology_id=tech.technology_id, title=tech.paper_title,
                                  context=format_context(list(sources.values())))
+    if instruction:
+        user += "\nSupervisor 작업 지시: " + instruction
+    if previous is not None:
+        user += "\n기존 근거는 유지하고 요청 항목을 보완하세요: " + previous.model_dump_json()
     profile = validate_claims(ask(TechnologyResearch, P.EXTRACT_SYSTEM, user).model_dump(), tech, sources)
 
     # 검증에서 필수 항목이 비면 사유를 붙여 한 번 다시 추출한다
@@ -186,10 +186,23 @@ def research_node(state: GraphState, retrieve=None, ask=None) -> dict:
     profiles = []
     cited: dict[str, Source] = {}
     for tech in state["request"].technologies:
-        sources = collect_sources(tech, retrieve, ask)
-        profile = extract_profile(tech, sources, ask)
+        instruction = state["decision"].instruction if state.get("decision") else ""
+        previous_result = state.get("research")
+        previous = next((p for p in previous_result.technologies if p.technology_id == tech.technology_id), None) if previous_result else None
+        if previous is not None and instruction:
+            # 재조사는 두 질의로 좁히고 기존 원문 근거를 함께 활용한다.
+            sources = {s.source_id: s for s in state.get("sources", []) if s.doc_id == tech.paper_doc_id}
+            queries = ask(SearchQueries, P.QUERY_SYSTEM,
+                          f"{tech.name}: 다음 보완 지시를 영어 논문 검색 질의 2개로 작성하세요. {instruction}")
+            for query in queries.queries[:2]:
+                for source in retrieve(tech.paper_doc_id, query, None):
+                    sources[source.source_id] = source
+        else:
+            sources = collect_sources(tech, retrieve, ask)
+        profile = extract_profile(tech, sources, ask, instruction=instruction, previous=previous)
         profiles.append(profile)
         for field in CLAIM_FIELDS:
             for claim in getattr(profile, field):
                 cited.setdefault(claim.source_id, sources[claim.source_id])
-    return {"research": ResearchResult(technologies=profiles), "sources": list(cited.values())}
+    old_ids = {s.source_id for s in state.get("sources", [])}
+    return {"research": ResearchResult(technologies=profiles), "sources": [s for s in cited.values() if s.source_id not in old_ids]}
