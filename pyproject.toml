@@ -44,7 +44,3 @@ packages = ["src/kvprism"]
 
 [tool.uv]
 package = true
-
-[tool.pytest.ini_options]
-pythonpath = ["src", "."]
-testpaths = ["tests"]
