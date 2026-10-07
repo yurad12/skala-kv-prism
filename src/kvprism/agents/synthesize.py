@@ -12,7 +12,6 @@ from .report_rules import CITATION, check_forbidden, cited_sources
 
 PROMPT = Path(__file__).resolve().parents[1] / "prompts" / "synthesize.md"
 PERSPECTIVES = ("market", "stakeholder", "domain")
-# 종합에 사용하는 조사·평가 결과
 INPUT_KEYS = ("request", "research", "market_eval", "stakeholder_eval", "domain_eval")
 
 
@@ -22,7 +21,6 @@ def synthesize_node(state: GraphState, *, llm=None) -> dict:
     context["previous_synthesis"] = state["synthesis"].model_dump(mode="json") if state.get("synthesis") else None
     context["instruction"] = state["decision"].instruction if state.get("decision") else ""
     context["sources"] = [source.model_dump(mode="json") for source in state["sources"]]
-    # 인용에 쓸 수 있는 ID. 목록 밖의 값은 검사에서 걸린다
     context["source_ids"] = [source.source_id for source in state["sources"]]
     # TRL 근거로 쓸 수 있는 ID. 기술별 trl_signals에 기록된 것만 인정한다
     context["trl_source_ids"] = {

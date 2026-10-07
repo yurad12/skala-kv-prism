@@ -38,9 +38,7 @@ class RelevanceVerdict(BaseModel):
     revised_query: str | None = Field(default=None, description="부족할 때 한 번 고친 영어 질의")
 
 
-# ---------------------------------------------------------------------------
 # LLM 호출 (설계 문서 2.4: Generator 는 reasoning effort low, temperature 미사용)
-# ---------------------------------------------------------------------------
 
 
 def make_ask(replay: bool = False):
@@ -68,9 +66,7 @@ def format_context(sources: list[Source]) -> str:
     return "\n\n".join(f"{s.url_or_page} (source_id: {s.source_id})\n{s.excerpt}" for s in sources)
 
 
-# ---------------------------------------------------------------------------
 # 1) 검색: LLM 이 항목별 영어 질의를 쓰고, 검색 결과가 부족하면 질의를 한 번 고쳐 다시 검색
-# ---------------------------------------------------------------------------
 
 QUERIES_PER_ASPECT = 2
 
@@ -111,9 +107,7 @@ def collect_sources(tech: Technology, retrieve, ask, k: int | None = None) -> di
     return found
 
 
-# ---------------------------------------------------------------------------
 # 2) 인용 검증: 근거 없는 인용과 수치를 걸러낸다 (설계 문서 4.1 "근거 청크가 없는 수치는 쓰지 않는다")
-# ---------------------------------------------------------------------------
 
 # 문장에서 수치를 뽑는 정규식. 글자·하이픈·점 바로 뒤의 숫자(Llama-3.1, v0.17.0)는 이름의 일부라 제외한다
 NUMBER_RE = re.compile(r"(?<![A-Za-z\-.\d−])\d+(?:\.\d+)?")
@@ -147,9 +141,7 @@ def validate_claims(profile: dict, tech: Technology, sources: dict[str, Source])
     return profile
 
 
-# ---------------------------------------------------------------------------
 # 3) 추출: 모은 청크만 근거로 TechnologyResearch 를 만든다
-# ---------------------------------------------------------------------------
 
 
 def extract_profile(tech: Technology, sources: dict[str, Source], ask, *, instruction="", previous=None) -> TechnologyResearch:
@@ -170,9 +162,7 @@ def extract_profile(tech: Technology, sources: dict[str, Source], ask, *, instru
     return TechnologyResearch.model_validate(profile)
 
 
-# ---------------------------------------------------------------------------
 # LangGraph 노드
-# ---------------------------------------------------------------------------
 
 
 def research_node(state: GraphState, retrieve=None, ask=None) -> dict:

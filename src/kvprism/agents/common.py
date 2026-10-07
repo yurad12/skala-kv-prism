@@ -112,7 +112,6 @@ def evaluate_perspective_node(
             f"참조 출처:\n{sources_text if sources_text else '(수집된 웹 출처 없음)'}"
         )
 
-    # 3. LLM 메세지 조립
     domain_header = f"도메인: {domain}\n시나리오: {scenario}\n\n" if use_domain_context else ""
     user_content = (
         f"{domain_header}{chr(10).join(tech_contexts)}{retry_note}\n\n"
@@ -132,7 +131,6 @@ def evaluate_perspective_node(
     llm = ChatOpenAI(model=model_name, timeout=120, max_retries=1).with_structured_output(_RawPerspectiveResult)
     raw: _RawPerspectiveResult = llm.invoke(messages)
 
-    # 4. StrictModel 규격 변환 및 stance 검증 통과 보장
     target_ids = {t.technology_id for t in req.technologies}
     evaluations: list[TechnologyEvaluation] = [
         TechnologyEvaluation(
@@ -161,7 +159,6 @@ def evaluate_perspective_node(
         f"{perspective}_eval": PerspectiveResult(perspective=perspective, evaluations=evaluations),
         "sources": [s for s in merged if s.source_id not in old_ids],
     }
-
 
 
 def _format_research(

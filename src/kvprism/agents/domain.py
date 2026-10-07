@@ -42,7 +42,6 @@ def _get_domain_queries(tech_name: str, domain: str, scenario: str) -> list[str]
 
 def domain_node(state: GraphState) -> dict:
     """도메인 평가 노드: 논문 RAG 청크를 검색해 웹 검색 결과와 함께 평가합니다."""
-    # 1. 도메인 평가에 필요한 논문 실험 조건 RAG 검색
     rag_sources: list[Source] = []
     for tech in state["request"].technologies:
         queries = [
@@ -65,7 +64,6 @@ def domain_node(state: GraphState) -> dict:
                     raise RuntimeError("도메인 실험 조건의 논문 근거를 확보하지 못했습니다") from error
                 log.warning("[%s] 추가 RAG 검색 실패, 이미 등록된 실험 조건 근거 사용", tech.technology_id)
 
-    # 2. 웹 검색 및 LLM 평가는 기존 common 함수에 위임 (extra_sources로 RAG 청크 전달)
     return evaluate_perspective_node(
         state=state,
         perspective="domain",

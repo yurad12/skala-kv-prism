@@ -67,7 +67,6 @@ def report_node(state: GraphState, *, llm=None, output_dir: str | Path = "output
         """장별 본문 생성. 검사에 걸리면 무엇이 틀렸는지 알려주고 한 번 다시 요청."""
         request = {
             "chapter": chapter, "guide": guide, "body": body, "context": context,
-            # 인용에 쓸 수 있는 ID. 목록 밖의 태그는 검사에서 걸린다
             "source_ids": [source.source_id for source in state["sources"]],
         }
         for retried in (False, True):
@@ -127,7 +126,6 @@ def report_node(state: GraphState, *, llm=None, output_dir: str | Path = "output
         pdf_path=pdf_path,
         reference_source_ids=[source.source_id for source in references],
     )}
-
 
 
 def _trl_table(synthesis: SynthesisResult, names: dict[str, str]) -> str:

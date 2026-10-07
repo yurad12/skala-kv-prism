@@ -22,7 +22,6 @@ FORBIDDEN = re.compile(
 )
 # 인용 태그. 링크 표기 [제목](url)는 제외
 CITATION = re.compile(r"\[([^\]\n]+)\](?!\()")
-# 논문 서지 정보 출처. doc_id 기준
 RAG_CONFIG = Path(__file__).resolve().parents[3] / "configs" / "rag.yaml"
 PATENT_HOSTS = ("patents.google.com", "patents.uspto.gov", "kipris.or.kr")
 
@@ -43,7 +42,6 @@ def cited_sources(text: str, sources: Sequence[Source]) -> list[Source]:
     by_tag: dict[str, Source] = {}
     for source in sources:
         by_tag.setdefault(source.source_id, source)
-        # [TQ p.7] 형식의 페이지 태그. 조회 키는 대괄호를 뺀 값이다
         by_tag.setdefault(source.url_or_page.strip("[]"), source)
 
     used: dict[str, Source] = {}
@@ -87,7 +85,6 @@ def _paper_docs() -> dict:
 
 
 def _paper_line(source: Source, meta: dict) -> str:
-    # 논문 : 저자(YYYY). 논문제목. *학술지/학회명*, 번호.
     # 저자 뒤 소속 괄호는 연도 괄호와 겹치므로 제거
     author = re.sub(r"\s*\([^)]*\)$", "", meta.get("authors") or source.author_or_org)
     year = str(meta.get("published") or source.published_at or "")[:4] or "연도 미상"
@@ -99,7 +96,6 @@ def _paper_line(source: Source, meta: dict) -> str:
 
 
 def _web_line(source: Source) -> str:
-    # 기타 : 기관명 또는 작성자(YYYY-MM-DD). *제목*. 사이트명, URL
     date = source.published_at or "날짜 미상"
     site = urlparse(source.url_or_page).netloc.removeprefix("www.") or source.url_or_page
     return (
@@ -115,7 +111,6 @@ def _patent_line(source: Source) -> str:
 
 
 def _plain(value: str) -> str:
-    # 검색 결과 제목 끝에 붙는 말줄임표를 없앤다
     return " ".join(value.split()).rstrip(". ").removesuffix("..").strip()
 
 
@@ -133,7 +128,6 @@ def _is_quote(line: str, sources: Sequence[Source]) -> bool:
     )
 
 
-# 원문 인용을 보존하는 Supervisor 보고서 계약
 def build_source_references(sources: Sequence[Source]) -> str:
     """검증용 원본에는 페이지로 합치기 전 모든 인용 ID를 남긴다."""
     return "# REFERENCE\n\n" + "\n".join(
@@ -180,7 +174,6 @@ def validate_report_artifact(report, sources: Sequence[Source]) -> int:
         return len(pdf)
 
 
-# 보고서 작성과 품질 평가에서 공유하는 방법론
 REPORT_METHODOLOGY = (
     "구현 절차: Supervisor는 등록된 발췌문과 관점 결과로 다음 작업을 선택한다. "
     "종합·보고서는 등록된 출처 ID와 작성자의 우열 표현을 코드로 검사한다. "
