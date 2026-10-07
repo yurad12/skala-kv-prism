@@ -15,7 +15,7 @@ class RecordingGraph:
         self.final_state = final_state
         self.received = None
 
-    def invoke(self, state: dict) -> dict:
+    def invoke(self, state: dict, config=None) -> dict:
         self.received = state
         return self.final_state
 
@@ -40,16 +40,32 @@ def test_replay_argument_overrides_config_value(tmp_path: Path) -> None:
     assert request.replay is True
 
 
-def test_run_pipeline_validates_graph_final_state() -> None:
+def test_run_pipeline_validates_graph_final_state(tmp_path) -> None:
     request = app.load_pipeline_input(app.DEFAULT_INPUT)
     graph = RecordingGraph({"request": request})
 
-    with pytest.raises(ValueError, match="그래프 출력에 필수 필드가 없습니다"):
-        app.run_pipeline(request, graph=graph)
+    result = app.run_pipeline(request, graph=graph, output_root=tmp_path)
+    assert result.status == "failed"
+    assert result.output is None
+    assert graph.received["request"] == request
+    assert graph.received["step_count"] == 0
+    assert graph.received["status"] == "running"
+    assert "retry_count" not in graph.received
 
-    assert graph.received == {
-        "request": request,
-        "retry_count": 0,
-        "retry_targets": [],
-        "sources": [],
-    }
+
+def test_cli_prefers_project_env(tmp_path, monkeypatch):
+    """외부 프로세스의 키가 프로젝트 설정을 가리지 않도록 한다."""
+    import os
+    import sys
+    from kvprism.graph.supervisor_state import SupervisorOutput
+    (tmp_path / '.env').write_text('OPENAI_API_KEY=project-test-value\n')
+    monkeypatch.setenv('OPENAI_API_KEY', 'inherited-test-value')
+    monkeypatch.setattr(app, 'ROOT', tmp_path)
+    monkeypatch.setattr(sys, 'argv', ['app.py'])
+
+    def run(request):
+        assert os.environ['OPENAI_API_KEY'] == 'project-test-value'
+        return SupervisorOutput(status='incomplete', trace_id='test', termination_reason='테스트 종료')
+
+    monkeypatch.setattr(app, 'run_pipeline', run)
+    assert app.main() == 2

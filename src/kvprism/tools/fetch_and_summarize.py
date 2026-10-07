@@ -17,7 +17,7 @@ from langchain_openai import ChatOpenAI
 
 from ..graph.state import Source
 
-load_dotenv(override=True)
+load_dotenv()
 
 CACHE_DIR = Path("outputs/cache")
 CACHE_DIR.mkdir(parents=True, exist_ok=True)

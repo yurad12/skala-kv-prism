@@ -85,7 +85,7 @@ def test_research_node_requeries_once_validates_citations_and_registers_sources(
     assert ids == sorted({"turboquant:p1:0", "turboquant:p9:0", "turboquant:p2:0", "itme:p1:0", "itme:p9:0", "itme:p2:0"})
 
 
-def test_validate_claims_moves_or_drops_claims_whose_numbers_are_not_in_excerpt():
+def test_validate_claims_drops_claims_whose_numbers_are_not_in_cited_excerpt():
     tech = make_techs()[1]
     sources = {
         "itme:p9:4": make_source("itme", 9, 4, "0 5 10 15 20 25 Turn 1.00 1.25 1.50 TTFT Speedup"),
@@ -96,13 +96,13 @@ def test_validate_claims_moves_or_drops_claims_whose_numbers_are_not_in_excerpt(
         experimental_conditions=[EvidenceClaim(statement="조건", source_id="itme:p2:4")],
         limitations=[EvidenceClaim(statement="한계", source_id="itme:p2:4", stance="negative")],
         performance_metrics=[
-            EvidenceClaim(statement="ITME는 1.8× 처리량 향상 (1,000 tokens)", source_id="itme:p9:4", stance="positive"),  # 이동 (1.8 == 1.80)
+            EvidenceClaim(statement="ITME는 1.8× 처리량 향상 (1,000 tokens)", source_id="itme:p9:4", stance="positive"),  # 인용한 발췌문에 없는 수치이므로 제거
             EvidenceClaim(statement="turn 5에서 1.81× speedup", source_id="itme:p9:4", stance="positive"),  # 제거
             EvidenceClaim(statement="Turn 25까지 측정", source_id="itme:p9:4"),  # 유지
         ],
     ).model_dump()
     out = validate_claims(profile, tech, sources)
-    assert [(c["statement"][:4], c["source_id"]) for c in out["performance_metrics"]] == [("ITME", "itme:p2:4"), ("Turn", "itme:p9:4")]
+    assert [(c["statement"][:4], c["source_id"]) for c in out["performance_metrics"]] == [("Turn", "itme:p9:4")]
     assert out["overview"] == "ITME 개요 끝"  # overview 에 섞인 source_id 제거
 
 
@@ -138,3 +138,19 @@ def test_collect_sources_skips_llm_when_nothing_retrieved():
 
     assert collect_sources(make_techs()[0], lambda d, q, k: [], ask) == {}
     assert calls == [SearchQueries]  # 질의 생성 1회뿐, 관련성 판정은 부르지 않음
+
+
+def test_research_rework_uses_two_queries_per_technology():
+    from kvprism.graph.supervisor_state import SupervisorDecision
+    retrieve, ask = FakeRetrieve(), FakeAsk()
+    state = {'request': PipelineInput(domain='데이터센터', scenario='장문맥', technologies=make_techs()), 'sources': []}
+    state.update(research_node(state, retrieve, ask))
+    retrieve.calls.clear()
+    state['decision'] = SupervisorDecision(
+        action='research', reason='조건 보완', instruction='실험 조건만 확인하세요',
+        evidence_status='insufficient', gaps=['실험 조건'],
+    )
+    result = research_node(state, retrieve, ask)
+    assert len(retrieve.calls) == 4
+    assert result['sources'] == []
+    assert len(result['research'].technologies) == 2

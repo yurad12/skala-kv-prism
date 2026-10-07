@@ -241,3 +241,27 @@ def test_perspective_node_requires_research_result(graph_state) -> None:
 
     with pytest.raises(ValueError, match="research 결과가 필요합니다"):
         market_node(graph_state)
+
+
+def test_rework_receives_instruction_and_preserves_previous_evidence(graph_state, monkeypatch):
+    from kvprism.graph.supervisor_state import SupervisorDecision
+    first = market_node(graph_state)
+    graph_state['market_eval'] = first['market_eval']
+    graph_state['sources'].extend(first['sources'])
+    graph_state['decision'] = SupervisorDecision(
+        action='market', reason='채택 근거 보완', instruction='릴리스 상태만 추가 확인하세요',
+        evidence_status='insufficient', gaps=['릴리스 상태'],
+    )
+    queries = []
+
+    def search(query, max_results):
+        queries.append(query)
+        return [make_web_source('turboquant' if 'TurboQuant' in query else 'itme')]
+
+    monkeypatch.setattr('kvprism.agents.common.web_search', search)
+    output = market_node(graph_state)
+    assert len(queries) == 2
+    assert all('릴리스 상태만' in query for query in queries)
+    assert '이전 결과' in FakeChatOpenAI.prompts[-1]
+    assert output['sources'] == []
+    assert len(output['market_eval'].evaluations) == 2

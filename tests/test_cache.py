@@ -1,29 +1,19 @@
-import time
-from pathlib import Path
-from dotenv import load_dotenv
+"""캐시 적중 시 외부 검색을 반복하지 않는지 검증한다."""
 
-load_dotenv(override=True)
+from importlib import import_module
+from unittest.mock import Mock
 
-from kvprism.tools.web_search import web_search
 
-query = "TurboQuant LLM serving benchmark"
-
-# 1회차 호출 (Cache Miss 또는 기존 캐시 로드)
-start_1 = time.time()
-res_1 = web_search(query=query, max_results=2)
-dur_1 = time.time() - start_1
-
-# 2회차 호출 (반드시 Cache Hit 발생)
-start_2 = time.time()
-res_2 = web_search(query=query, max_results=2)
-dur_2 = time.time() - start_2
-
-cache_files = list(Path("outputs/cache").glob("*.json"))
-
-print("=" * 50)
-print(f"1회차 실행 시간: {dur_1:.4f}초 (결과: {len(res_1)}건)")
-print(f"2회차 실행 시간: {dur_2:.4f}초 (결과: {len(res_2)}건)")
-print(f"outputs/cache 생성된 JSON 파일 수: {len(cache_files)}개")
-if cache_files:
-    print(f"최근 생성된 캐시 파일: {cache_files[-1].name}")
-print("=" * 50)
+def test_second_search_uses_cache(tmp_path, monkeypatch):
+    module = import_module("kvprism.tools.web_search")
+    client = Mock()
+    client.search.return_value = {"results": [{
+        "url": "https://example.com/paper", "title": "공개 자료", "content": "원문 근거",
+    }]}
+    monkeypatch.setenv("TAVILY_API_KEY", "test-only")
+    monkeypatch.setattr(module, "CACHE_DIR", tmp_path)
+    monkeypatch.setattr(module, "TavilyClient", lambda **kwargs: client)
+    first = module.web_search("테스트 질의", max_results=2)
+    second = module.web_search("테스트 질의", max_results=2)
+    assert first == second
+    client.search.assert_called_once()
