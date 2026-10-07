@@ -131,3 +131,66 @@ def _is_quote(line: str, sources: Sequence[Source]) -> bool:
         source.source_id == tag.group(1) and quote and quote in source.excerpt
         for source in sources
     )
+
+
+# 원문 인용을 보존하는 Supervisor 보고서 계약
+def build_source_references(sources: Sequence[Source]) -> str:
+    """검증용 원본에는 페이지로 합치기 전 모든 인용 ID를 남긴다."""
+    return "# REFERENCE\n\n" + "\n".join(
+        f"- [{s.source_id}] {s.author_or_org}. {s.title}. {s.url_or_page}"
+        for s in sources
+    ) + "\n"
+
+
+def display_report(source_markdown: str, sources: Sequence[Source]) -> str:
+    """같은 본문에 표시용 페이지 태그와 중복 제거된 서지만 적용한다."""
+    body = source_markdown.split("# REFERENCE", 1)[0]
+    references = cited_sources(body, sources)
+    web_labels = {}
+    for source in references:
+        if source.source_kind == "paper":
+            body = body.replace(f"[{source.source_id}]", source.url_or_page)
+        else:
+            # 같은 URL의 여러 발췌문은 참고문헌에 남는 첫 ID로 연결한다.
+            label = web_labels.setdefault(source.url_or_page, source.source_id)
+            body = body.replace(f"[{source.source_id}]", f"[{label}]")
+    return body + build_references(references) + "\n"
+
+
+def validate_report_artifact(report, sources: Sequence[Source]) -> int:
+    """인용 ID·참고문헌·표시용 변환을 확인하고 실제 PDF 페이지 수를 반환한다."""
+    import pymupdf
+
+    original = report.source_markdown_path.read_text(encoding="utf-8")
+    if original.count("# REFERENCE") != 1 or "# SUMMARY" not in original:
+        raise ValueError("SUMMARY와 REFERENCE가 필요합니다")
+    body, refs = original.split("# REFERENCE", 1)
+    registered = {s.source_id for s in sources}
+    tags = set(CITATION.findall(body))
+    if not tags or tags - registered:
+        raise ValueError("본문에는 등록된 원문 source_id 인용이 필요합니다")
+    ref_ids = set(re.findall(r"(?m)^- \[([^\]]+)\]", refs))
+    if tags != set(report.reference_source_ids) or tags != ref_ids:
+        raise ValueError("본문 인용·REFERENCE·reference_source_ids가 일치하지 않습니다")
+    if report.markdown_path.read_text(encoding="utf-8") != display_report(original, sources):
+        raise ValueError("표시용 Markdown이 근거 원본과 다릅니다")
+    with pymupdf.open(report.pdf_path) as pdf:
+        if not len(pdf) or not any(page.get_text().strip() for page in pdf):
+            raise ValueError("PDF 내용이 비어 있습니다")
+        return len(pdf)
+
+
+# 보고서 작성과 품질 평가에서 공유하는 방법론
+REPORT_METHODOLOGY = (
+    "구현 절차: Supervisor는 등록된 발췌문과 관점 결과로 다음 작업을 선택한다. "
+    "종합·보고서는 등록된 출처 ID와 작성자의 우열 표현을 코드로 검사한다. "
+    "보고서 작성 후 별도 품질 노드가 근거성·중립성·편향·관점 충족·형식을 검사한다. "
+    "이는 검사 절차 설명이며, 현재 보고서의 통과나 모든 주장에 대한 보증은 아니다."
+)
+TRL_GUIDE = (
+    "TRL은 출처에 보고된 점수가 아니라 공개 근거를 다음 기준에 대응한 작성자의 추정이다. "
+    "1~2: 개념·원리, 3: 논문 내 실험·프로토타입, 4: 외부 재현·통합 테스트, "
+    "5: 관련 환경 구성요소 검증, 6: 관련 환경 시스템 시연, 7: 서비스·파일럿, "
+    "8: 양산 적합성 검증, 9: 상용 운용. "
+    "근거가 없는 항목은 판정 불가로 표시하며, 제안 시스템과 기반 구성요소의 성숙도를 구분한다."
+)
