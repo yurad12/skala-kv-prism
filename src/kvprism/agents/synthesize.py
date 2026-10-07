@@ -1,6 +1,4 @@
-"""
-@desc   : 평가 종합 노드. TRL 추정과 관점 x 기술 매트릭스, 상충 지점 도출
-"""
+"""TRL 추정, 관점별 매트릭스와 상충 지점을 작성하는 종합 노드."""
 
 import json
 import os
@@ -14,16 +12,15 @@ from .report_rules import CITATION, check_forbidden, cited_sources
 
 PROMPT = Path(__file__).resolve().parents[1] / "prompts" / "synthesize.md"
 PERSPECTIVES = ("market", "stakeholder", "domain")
-# 두 노드가 프롬프트에 넣는 State 키
-INPUT_KEYS = ("request", "research", "market_eval", "stakeholder_eval", "domain_eval", "judge")
-# 3.3의 상태 어휘
-ADOPTED_WORDS = ("병합", "릴리스", "적용")
-PENDING_WORDS = ("제안", "않", "못", "예정", "계획", "미정")
+# 종합에 사용하는 조사·평가 결과
+INPUT_KEYS = ("request", "research", "market_eval", "stakeholder_eval", "domain_eval")
 
 
 def synthesize_node(state: GraphState, *, llm=None) -> dict:
     """담당 키 synthesis만 반환. 검사에 걸리면 한 번 다시 요청."""
     context = {key: state[key].model_dump(mode="json") for key in INPUT_KEYS}
+    context["previous_synthesis"] = state["synthesis"].model_dump(mode="json") if state.get("synthesis") else None
+    context["instruction"] = state["decision"].instruction if state.get("decision") else ""
     context["sources"] = [source.model_dump(mode="json") for source in state["sources"]]
     # 인용에 쓸 수 있는 ID. 목록 밖의 값은 검사에서 걸린다
     context["source_ids"] = [source.source_id for source in state["sources"]]
@@ -35,7 +32,7 @@ def synthesize_node(state: GraphState, *, llm=None) -> dict:
     if llm is None:
         load_dotenv()
         # 설계서 2.4의 Generator 설정. 추론 모델이라 temperature 미지정
-        llm = ChatOpenAI(model=os.getenv("GENERATOR_MODEL") or "gpt-5.6-luna", reasoning_effort="medium")
+        llm = ChatOpenAI(model=os.getenv("GENERATOR_MODEL") or "gpt-5.6-luna", reasoning_effort="medium", timeout=120, max_retries=1)
 
     model = llm.with_structured_output(SynthesisResult)
     messages = [
@@ -100,7 +97,10 @@ def _limit_trl(estimate: TRLEstimate, state: GraphState, sources: dict[str, Sour
         cited = set(CITATION.findall(part)) & set(estimate.source_ids)
         ceiling = _ceiling([signal for signal in signals if signal.source_id in cited], sources)
         if getattr(estimate, field) > ceiling:
-            setattr(estimate, field, ceiling)
+            raise ValueError(
+                f"{estimate.technology_id}의 {field}={getattr(estimate, field)}는 "
+                f"인용한 근거 범위의 상한 {ceiling}을 넘습니다. 점수와 rationale을 함께 수정하세요"
+            )
 
 
 def _split_rationale(rationale: str) -> tuple[str, str]:
@@ -115,27 +115,24 @@ def _split_rationale(rationale: str) -> tuple[str, str]:
 
 
 def _trl_signals(state: GraphState, technology_id: str) -> list[EvidenceClaim]:
-    """기술 조사·시장 평가가 남긴 해당 기술의 TRL 신호."""
-    items = [*state["research"].technologies, *state["market_eval"].evaluations]
-    return [
-        signal
-        for item in items
-        if item.technology_id == technology_id
-        for signal in item.trl_signals
-    ]
+    """해당 기술의 검증 환경과 채택 상태를 판단할 수 있는 근거."""
+    signals = []
+    for item in state["research"].technologies:
+        if item.technology_id == technology_id:
+            # 실험 환경도 성숙도 판단의 직접 근거이므로 별도 태그에만 의존하지 않는다.
+            signals.extend(item.trl_signals)
+            signals.extend(item.experimental_conditions)
+    for item in state["market_eval"].evaluations:
+        if item.technology_id == technology_id:
+            signals.extend(item.trl_signals)
+    return signals
 
 
 def _ceiling(signals: list[EvidenceClaim], sources: dict[str, Source]) -> int:
-    """근거별 TRL 상한. 논문만 3, 논문 밖 4, 채택 상태 확인 시 제한 없음."""
+    """논문만으로는 3까지 허용한다. 외부 근거의 실제 단계는 품질 평가에서 확인한다."""
     outside = [
         signal.statement for signal in signals if sources[signal.source_id].source_kind == "web"
     ]
     if not outside:
         return 3
-    return 9 if any(_adopted(statement) for statement in outside) else 4
-
-
-def _adopted(statement: str) -> bool:
-    return any(word in statement for word in ADOPTED_WORDS) and not any(
-        word in statement for word in PENDING_WORDS
-    )
+    return 9
