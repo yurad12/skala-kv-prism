@@ -11,10 +11,10 @@
 
 ## 브랜치와 통합
 
-- 기존 RAG의 `main`과 Supervisor 통합 브랜치 `develop/supervisor`를 구분한다.
-- `feature/supervisor-implementation`은 공통 초안 기준 브랜치다. 팀원 브랜치는 이 초안의 동일한 커밋에서 만들고, `develop/supervisor`도 같은 기준 커밋으로 준비한다.
+- 기존 RAG의 `main`과 Supervisor 통합 브랜치 `develop/agent-supervisor`를 구분한다.
+- `feature/supervisor-implementation`은 공통 초안 기준 브랜치다. 팀원 브랜치는 이 초안의 동일한 커밋에서 만들고, `develop/agent-supervisor`도 같은 기준 커밋으로 준비한다.
 - 모두 동일한 통합 초안 커밋에서 담당 브랜치를 만든다. 브랜치나 초안 반영 여부를 확인하지 않고 생성·병합하지 않는다.
-- 팀원 PR의 대상은 `develop/supervisor`이다. `main`으로 직접 합치지 않는다.
+- 팀원 PR의 대상은 `develop/agent-supervisor`이다. `main`으로 직접 합치지 않는다.
 - 머지 완료 후 해당 역할 브랜치를 삭제할 수 있다. 공통 초안과 통합 브랜치는 유지한다.
 - 다른 팀원의 작업을 임의로 덮어쓰거나 브랜치·파일·커밋을 삭제하지 않는다.
 
