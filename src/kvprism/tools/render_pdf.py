@@ -48,6 +48,19 @@ def number_web_references(report_md: str) -> str:
     return re.sub(pattern, lambda match: f"[{labels[match.group(1)]}]", report_md)
 
 
+def validate_summary(summary: str) -> None:
+    """현재 글꼴·여백에서 SUMMARY가 A4 반 페이지 안에 들어가는지 확인한다."""
+    renderer = MarkdownPdf(toc_level=2)
+    renderer.m_d.disable("html_block").disable("html_inline").disable("image")
+    page = pymupdf.paper_rect("a4")
+    story = pymupdf.Story(
+        html=renderer.m_d.render(summary), user_css=REPORT_CSS, archive=str(FONT_DIR),
+    )
+    overflow, _ = story.place(pymupdf.Rect(MARGIN, MARGIN, page.width - MARGIN, page.height / 2))
+    if overflow:
+        raise ValueError("SUMMARY가 A4 반 페이지를 넘습니다. 문단 구성은 유지하고 각 문단을 한두 문장으로 줄이세요")
+
+
 def render_pdf(report_md: str, output_path: str | Path = "outputs/RAG-Output.pdf") -> Path:
     """표지를 포함한 PDF를 저장하고 SUMMARY의 반 페이지 제한을 검사한다."""
     for name in ("KVPrismSans-Regular.ttf", "KVPrismSans-Bold.ttf"):
@@ -62,13 +75,7 @@ def render_pdf(report_md: str, output_path: str | Path = "outputs/RAG-Output.pdf
         raise ValueError("SUMMARY가 없습니다")
     body, _, references = (marker + content).partition("# REFERENCE")
     summary = body.split("\n# ", 1)[0]
-    page = pymupdf.paper_rect("a4")
-    story = pymupdf.Story(
-        html=pdf.m_d.render(summary), user_css=REPORT_CSS, archive=str(FONT_DIR),
-    )
-    overflow, _ = story.place(pymupdf.Rect(MARGIN, MARGIN, page.width - MARGIN, page.height / 2))
-    if overflow:
-        raise ValueError("SUMMARY가 A4 반 페이지를 넘습니다")
+    validate_summary(summary)
 
     # 기존 제목과 메타데이터를 표지에 그대로 사용한다.
     cover = re.sub(r"\*\*(.+?)\*\*", r"\n## \1\n", cover)

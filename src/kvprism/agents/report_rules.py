@@ -63,8 +63,8 @@ def build_references(sources: Sequence[Source]) -> str:
     listed_urls: set[str] = set()
     for source in sources:
         if source.source_kind == "paper":
-            # 청크가 달라도 같은 논문이면 한 줄. 페이지는 본문 인용 태그가 가리킨다
-            if source.doc_id in listed_docs:
+            # 청크·페이지가 달라도 같은 논문이면 한 줄. 페이지는 본문 인용 태그([TQ p.7])가 가리킨다
+            if (source.doc_id or "") in listed_docs:
                 continue
             listed_docs.add(source.doc_id or "")
             lines.append(_paper_line(source, papers.get(source.doc_id or "", {})))

@@ -90,10 +90,14 @@ def supervisor_node(state: SupervisorState, *, llm=None) -> dict:
         ]))
         if decision.action not in actions:
             raise ValueError(f"허용되지 않은 행동: {decision.action}; 허용 목록: {actions}")
-        if decision.evidence_status == "sufficient" and decision.gaps:
-            raise ValueError("근거 충분 판정과 미해결 gaps가 모순됩니다")
-        if decision.action in ("synthesize", "report") and decision.evidence_status != "sufficient":
-            raise ValueError("종합·보고서에는 Supervisor의 근거 충분 판정이 필요합니다")
+        # 품질 미달 뒤의 gaps는 조사 공백이 아니라 수정할 보고서 문제일 수 있다.
+        quality = state.get("quality")
+        repairing = quality is not None and not quality.passed
+        if not repairing:
+            if decision.evidence_status == "sufficient" and decision.gaps:
+                raise ValueError("최초 작성 전 sufficient이면 gaps에는 분석을 막는 공백이 없어야 합니다. 미확인 한계는 instruction에 적으세요")
+            if decision.action in ("synthesize", "report") and decision.evidence_status != "sufficient":
+                raise ValueError("최초 종합·보고서는 sufficient와 빈 gaps가 필요합니다. 핵심 근거가 없으면 조사나 abort를 선택하세요")
         update.update(decision=decision, invalid_decisions=0, last_error=None)
         if decision.action == "finish":
             validate_success_payload(state)

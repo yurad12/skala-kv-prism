@@ -10,7 +10,7 @@ from dotenv import load_dotenv
 from langchain_openai import ChatOpenAI
 
 from ..graph.state import GraphState, Source, SynthesisResult
-from ..tools.render_pdf import render_pdf
+from ..tools.render_pdf import render_pdf, validate_summary
 from .report_rules import CITATION, check_forbidden, cited_sources
 from ..graph.supervisor_state import ReportArtifact
 from .report_rules import (
@@ -37,16 +37,16 @@ SELECTION_REASON = """## 선정 방식
 SW·HW 분야에서 조가 직접 1건씩 선정했다.
 평가 범위는 데이터센터의 장문맥 멀티테넌트 LLM 추론이다."""
 
+# 소제목은 반 페이지의 40% 이상을 차지해 본문이 들어갈 자리가 없어진다. 굵은 머리말 문단으로 쓴다.
 SUMMARY_GUIDE = (
-    "이 요약만 읽는 사람을 위해 쓴다. 도입 문단이나 목차 안내 없이 다음 세 항목만 작성한다. "
-    "각 항목은 '## 1. 분석 대상과 범위', '## 2. 핵심 판단', '## 3. 적용 전 확인사항'이라는 "
-    "소제목과 그 아래 설명으로 구성한다. 소제목과 설명 사이, 항목 사이에 빈 줄을 둔다. "
-    "1번에는 두 기술이 다루는 병목과 평가 시나리오를 2문장 이내로 쓴다. "
-    "2번에는 기술별로 '**기술명**: 설명' 형식의 짧은 문단을 하나씩 쓴다. "
-    "각 기술의 검토 조건과 공개 근거가 뒷받침하는 범위를 설명하고, 성숙도 근거가 부족하면 판정 불가라고 쓴다. "
-    "3번에는 판단에 영향을 주는 미확인 조건을 최대 세 개의 짧은 글머리표로 쓴다. "
-    "각 문단은 2문장 이내로 쓰고 상세 성능 수치와 본문의 한계 목록을 반복하지 않는다. "
-    "기술 간 우열이나 도입 결정을 내리지 않는다. 전체 800자 이내."
+    "이 요약만 읽는 사람을 위해 쓴다. 소제목·글머리표·도입 문단 없이, 굵은 머리말로 시작하는 짧은 문단만 쓰고 문단 사이에 빈 줄을 둔다. "
+    "'**분석 범위**' 문단에는 두 기술이 다루는 병목과 평가 시나리오를 한 문장으로 쓴다. "
+    "이어서 기술마다 '**기술명**' 문단을 하나씩 쓴다. 공개 근거로 확인된 것과 확인되지 않은 것을 1~2문장으로 구분하고, "
+    "확인된 것에는 본문의 대표 수치 하나를 비교 기준·실험 조건과 함께 넣는다. 성숙도 근거가 부족하면 그 사실은 한 번만 쓴다. "
+    "'**평가가 갈리는 지점**' 문단에는 본문 상충 지점 중 핵심 1~2개를 어떤 관점끼리 어떻게 다르게 읽는지로 쓴다. "
+    "'**적용 전 확인**' 문단에는 판단을 바꿀 수 있는 미확인 조건 두세 개를 한 문장으로 쓴다. "
+    "본문에 없는 사실과 수치는 쓰지 않는다. 기술 간 우열이나 도입 결정을 내리지 않는다. "
+    "공백 포함 500~600자로 쓰고 A4 반 페이지를 넘기지 않는다."
 )
 
 
@@ -81,11 +81,16 @@ def report_node(state: GraphState, *, llm=None, output_dir: str | Path = "output
                     raise ValueError("생성된 본문이 비어 있습니다")
                 check_forbidden(text, state["sources"])
                 cited_sources(text, state["sources"])
+                if chapter == "SUMMARY":
+                    text = _strip_title(text, chapter)
+                    validate_summary("# SUMMARY\n\n" + text)
                 return text.strip()
             except ValueError as error:
                 if retried:
                     raise ValueError(f"{chapter}: {error}") from None
                 request["fix"] = f"직전 초안의 문제: {error}. 같은 문제를 반복하지 않는다."
+                if chapter == "SUMMARY":
+                    request["draft"] = text
 
     chapters = []
     for chapter, guide in CHAPTERS:
