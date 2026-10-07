@@ -81,8 +81,9 @@ def evaluate_perspective_node(
 
     for tech in req.technologies:
         research_text = _format_research(state, tech.technology_id, research_fields)
-        # 기술 조사에 연결된 논문 원문과 이전 관점 근거를 함께 전달한다.
-        tech_source_ids = [s.source_id for s in sources_by_id.values() if s.doc_id == tech.paper_doc_id]
+        # 논문 원문은 이 노드가 직접 찾은 청크(도메인 RAG)만 넣는다. 기술 조사 내용은 research_text로 이미 전달되며,
+        # 기술 조사의 청크까지 모두 넣으면 웹 출처 대신 논문만 인용하게 된다. 재작업이면 이전 관점 근거를 함께 전달한다.
+        tech_source_ids = [s.source_id for s in (extra_sources or []) if s.doc_id == tech.paper_doc_id]
         if previous is not None:
             old = next(e for e in previous.evaluations if e.technology_id == tech.technology_id)
             tech_source_ids.extend(c.source_id for c in (
@@ -121,7 +122,9 @@ def evaluate_perspective_node(
     messages = [
         SystemMessage(content=system_prompt + "\nSupervisor의 작업 지시를 반영하고 이전 결과의 타당한 근거는 유지하세요. "
                       "기존 주장도 원문 발췌로 다시 확인하며, 지지가 없으면 수정하세요. "
-                      "source_id에는 제공된 참조 출처만 사용하고 근거가 없는 사실은 만들지 마세요."),
+                      "source_id에는 제공된 참조 출처만 사용하고 근거가 없는 사실은 만들지 마세요. "
+                      "관점 판단(채택·입장·적용 조건)의 근거는 참조 출처를 우선 인용하고, "
+                      "기술 조사 항목의 인용은 기술 자체를 설명할 때만 쓰세요."),
         HumanMessage(content=user_content),
     ]
 
