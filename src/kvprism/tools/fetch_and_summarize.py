@@ -120,7 +120,7 @@ def fetch_and_summarize(url: str) -> tuple[str, Source]:
     context_text = full_text[:4000]
     messages = [
         SystemMessage(content=(
-            "당신은 기술 보고서 분석 전문가입니다. "
+            "당신은 기술 보고서 분석 전문가입니다."
             "주어진 본문에서 핵심 기술 내용, 주장, 실측 지표, 장단점을 3줄 이내로 명확하게 요약하세요."
         )),
         HumanMessage(content=f"웹페이지 본문:\n{context_text}"),
