@@ -6,7 +6,7 @@
 # 기술별로 반드시 채워야 하는 조사 항목 (한국어). 검색 질의는 LLM 이 이 항목을 보고 영어로 쓴다 (설계서 2.2.2)
 ASPECT_QUESTIONS_KO: dict[str, str] = {
     "mechanism": "핵심 아이디어와 동작 방식",
-    "performance_metrics": "성능 수치(메모리 절감, 압축률, 처리량, 지연, 정확도)",
+    "performance_metrics": "성능 수치(개선과 손실, 메모리 절감, 압축률, 처리량, 지연, 정확도), 각각의 비교 기준과 실험 조건",
     "experimental_conditions": "실험 조건(모델, 하드웨어, 데이터셋, 베이스라인, 문맥 길이)",
     "limitations": "저자가 밝힌 한계, 오버헤드, 전제",
     "trl_signals": "구현 형태(프로토타입/FPGA/시뮬레이터/실장비/공개 코드/프레임워크 통합)와 검증 환경",
@@ -21,6 +21,8 @@ Technology: {name}
 
 For each of the following research items (written in Korean), write 2 English search queries.
 Return them in the same order, 2 per item, as a flat list of {n} queries.
+For performance, include one query for headline improvements in the abstract/conclusion and
+one for the evaluation section with comparison baselines and configuration details.
 
 {items}"""
 
@@ -51,7 +53,9 @@ EXTRACT_SYSTEM = """당신은 논문 원문만을 근거로 기술 프로필을 
 6. trl_signals 에는 검증 환경을 판단할 수 있는 사실만 적습니다: 실험 형태(시뮬레이션/실제 LLM 적용/FPGA 프로토타입/실장비), 사용 하드웨어, 공개 구현·프레임워크 통합 언급.
 7. stance 는 성능·장점을 뒷받침하면 positive, 한계·비용·손실을 말하면 negative, 조건·설정 서술이면 neutral 로 둡니다.
 8. statement 와 overview 는 한국어로 씁니다. 고유명사, 지표명, 수치는 원문 표기를 유지합니다.
-9. 특정 기술의 우열이나 추천을 말하지 않습니다."""
+9. 특정 기술의 우열이나 추천을 말하지 않습니다.
+10. 성능 개선 결과와 손실·오버헤드를 함께 수집합니다. 개선율이나 배수마다 비교 기준과 조건을 구분합니다.
+    숫자를 본문에서 찾았더라도 모델·하드웨어 조건이 같은 발췌문에 없으면 이를 만들어 붙이지 않습니다."""
 
 EXTRACT_USER = """기술: {name} (technology_id: {technology_id})
 논문: {title}
