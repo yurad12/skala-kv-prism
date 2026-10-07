@@ -58,7 +58,7 @@ def validate_summary(summary: str) -> None:
     )
     overflow, _ = story.place(pymupdf.Rect(MARGIN, MARGIN, page.width - MARGIN, page.height / 2))
     if overflow:
-        raise ValueError("SUMMARY가 A4 반 페이지를 넘습니다. 세 항목을 유지하며 설명을 한 문장씩, 확인사항은 두 개 이하로 축약하세요")
+        raise ValueError("SUMMARY가 A4 반 페이지를 넘습니다. 문단 구성은 유지하고 각 문단을 한두 문장으로 줄이세요")
 
 
 def render_pdf(report_md: str, output_path: str | Path = "outputs/RAG-Output.pdf") -> Path:
