@@ -2,6 +2,7 @@
 
 import json
 import os
+import re
 from pathlib import Path
 
 import pymupdf
@@ -51,8 +52,19 @@ def report_quality_node(state, *, llm=None) -> dict:
         check_forbidden(body, sources)
     except ValueError as error:
         issue("neutrality", str(error))
+    # 목차와 필수 표는 의미 판단이 아닌 형식 규칙으로 확인한다.
+    missing_chapters = [number for number in range(1, 7)
+                        if not re.search(rf"(?m)^# {number}\.\s+\S", body)]
+    missing_tables = []
+    for label, rows in (("## 기술 성숙도", 2), ("## 관점 × 기술 매트릭스", 3)):
+        section = body.partition(label)[2].split("\n#", 1)[0]
+        pattern = r"(?m)^\|.+\|\n\|(?:\s*:?-+:?\s*\|)+\n(?:\|.+\|\n?){" + str(rows) + "}"
+        if not re.search(pattern, section):
+            missing_tables.append(label)
     if page_count > 10 or not page_count or "# SUMMARY" not in body or "# REFERENCE" not in original:
         issue("format", "SUMMARY·REFERENCE를 포함한 PDF를 1~10페이지로 작성하세요")
+    if missing_chapters or missing_tables:
+        issue("format", "1~6장과 기술 성숙도·관점 × 기술 매트릭스를 빠짐없이 작성하세요")
     labels = ("기술 성숙도", "시장", "이해관계자", "도메인")
     if any(label not in body for label in labels):
         issue("perspective_coverage", "성숙도·시장·이해관계자·도메인을 모두 설명하세요")
