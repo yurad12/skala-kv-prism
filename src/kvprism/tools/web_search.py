@@ -15,14 +15,9 @@ from urllib.parse import urlparse
 from dotenv import load_dotenv
 from tavily import TavilyClient
 
-load_dotenv(override=True)
-
 from ..graph.state import Source
 
-
-from dotenv import load_dotenv
-
-load_dotenv(override=True)
+load_dotenv()
 
 DEFAULT_MAX_RESULTS = 5
 CACHE_DIR = Path("outputs/cache")
@@ -52,7 +47,7 @@ KNOWN_DOMAINS: dict[str, str] = {
 
 
 def _get_cache_path(query: str, max_results: int) -> Path:
-    key=f"{query.strip()}_{max_results}"
+    key = f"{query.strip()}_{max_results}"
     query_hash = hashlib.md5(key.encode("utf-8")).hexdigest()
     return CACHE_DIR / f"search_{query_hash}.json"
 
@@ -117,7 +112,7 @@ def web_search(query: str, max_results: int = 5, topic:str="general") -> list[So
     # 2. Tavily 검색 실행
     api_key = os.getenv("TAVILY_API_KEY")
     if not api_key:
-        return []
+        raise RuntimeError("TAVILY_API_KEY가 없습니다")
     client = TavilyClient(api_key=api_key)
     try:
         response = client.search(
@@ -126,9 +121,10 @@ def web_search(query: str, max_results: int = 5, topic:str="general") -> list[So
             topic=topic,
             include_published_date=True,
             include_raw_content=False,
+            timeout=30,
         )
-    except Exception:
-        return []
+    except Exception as error:
+        raise RuntimeError("웹 검색 호출에 실패했습니다") from error
 
     # 3. Source 인스턴스 생성 및 캐시 저장
     sources: list[Source] = []

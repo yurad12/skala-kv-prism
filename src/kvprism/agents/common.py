@@ -1,6 +1,5 @@
 """관점 평가 노드 공통 실행 엔진."""
 
-
 from __future__ import annotations
 
 import os
@@ -18,6 +17,7 @@ from ..graph.state import (
     Source,
     Stance,
     TechnologyEvaluation,
+    merge_sources,
 )
 from ..tools.web_search import web_search
 
@@ -55,7 +55,7 @@ def evaluate_perspective_node(
     state: GraphState,
     perspective: Perspective,
     system_prompt: str,
-    query_fn: Any,
+    query_fn: Callable[[str, str, str], list[str]],
     extra_sources: list[Source] | None = None,
     use_domain_context: bool = False,
     research_fields: tuple[str, ...] = (),
@@ -64,33 +64,39 @@ def evaluate_perspective_node(
     domain = req.domain if use_domain_context else ""
     scenario = req.scenario if use_domain_context else ""
 
-    # 1. 재실행 지침 추출
-    retry_note = ""
-    if perspective in state.get("retry_targets", []) and state.get("judge"):
-        retry_note = next(
-            (f"\n[보완 지침]: {j.retry_instruction}" for j in state["judge"].judgments if j.perspective == perspective and not j.passed),
-            "",
-        )
+    # Supervisor의 지시와 자기 이전 결과만 재작업에 사용한다.
+    decision = state.get("decision")
+    instruction = decision.instruction if decision else ""
+    previous = state.get(f"{perspective}_eval")
+    retry_note = f"\n[Supervisor 작업 지시]: {instruction}" if instruction else ""
+    if previous is not None:
+        retry_note += "\n[이전 결과 - 타당한 근거는 유지]: " + previous.model_dump_json()
 
-    # 2. 웹 검색 및 출처 수집 (딕셔너리로 source_id 중복 즉시 차단)
-    sources_by_id: dict[str, Source] = {}
-
-    # 전달받은 외부 출처(domain 노드의 RAG 청크 등)가 있으면 먼저 등록
-    if extra_sources:
-        for s in extra_sources:
-            sources_by_id[s.source_id] = s
+    # 기존 근거와 새 논문 청크를 함께 읽되 동일 ID의 내용 충돌은 허용하지 않는다.
+    sources_by_id = {
+        s.source_id: s for s in merge_sources(state.get("sources", []), extra_sources)
+    }
 
     tech_contexts: list[str] = []
 
     for tech in req.technologies:
         research_text = _format_research(state, tech.technology_id, research_fields)
-        # 이 기술의 논문 RAG 청크(extra_sources)를 먼저 넣어 LLM 이 인용할 수 있게 한다
-        tech_source_ids: list[str] = [
-            s.source_id for s in (extra_sources or []) if s.doc_id == tech.paper_doc_id
-        ]
-        for q in query_fn(tech.name, domain, scenario):
+        # 기술 조사에 연결된 논문 원문과 이전 관점 근거를 함께 전달한다.
+        tech_source_ids = [s.source_id for s in sources_by_id.values() if s.doc_id == tech.paper_doc_id]
+        if previous is not None:
+            old = next(e for e in previous.evaluations if e.technology_id == tech.technology_id)
+            tech_source_ids.extend(c.source_id for c in (
+                old.positive_evidence + old.negative_evidence + old.neutral_evidence + old.trl_signals
+            ) if c.source_id in sources_by_id and c.source_id not in tech_source_ids)
+        queries = query_fn(tech.name, domain, scenario)
+        if previous is not None and instruction:
+            queries = [f"{tech.name} {instruction}"]
+        for q in queries:
             for s in web_search(query=q, max_results=2):
-                sources_by_id[s.source_id] = s
+                sources_by_id = {
+                    item.source_id: item
+                    for item in merge_sources(list(sources_by_id.values()), [s])
+                }
                 if s.source_id not in tech_source_ids:
                     tech_source_ids.append(s.source_id)
 
@@ -113,12 +119,14 @@ def evaluate_perspective_node(
     )
 
     messages = [
-        SystemMessage(content=system_prompt),
+        SystemMessage(content=system_prompt + "\nSupervisor의 작업 지시를 반영하고 이전 결과의 타당한 근거는 유지하세요. "
+                      "기존 주장도 원문 발췌로 다시 확인하며, 지지가 없으면 수정하세요. "
+                      "source_id에는 제공된 참조 출처만 사용하고 근거가 없는 사실은 만들지 마세요."),
         HumanMessage(content=user_content),
     ]
 
-    model_name = os.getenv("OPENAI_MODEL_NAME") or os.getenv("GENERATOR_MODEL") or "gpt-4o-mini"
-    llm = ChatOpenAI(model=model_name, temperature=0).with_structured_output(_RawPerspectiveResult)
+    model_name = os.getenv("GENERATOR_MODEL") or "gpt-5.6-luna"
+    llm = ChatOpenAI(model=model_name, timeout=120, max_retries=1).with_structured_output(_RawPerspectiveResult)
     raw: _RawPerspectiveResult = llm.invoke(messages)
 
     # 4. StrictModel 규격 변환 및 stance 검증 통과 보장
@@ -132,24 +140,25 @@ def evaluate_perspective_node(
             neutral_evidence=_make_claims(ev.neutral_evidence, stance="neutral"),
             trl_signals=_make_claims(ev.trl_signals),
         )
-        for ev in raw.evaluations if ev.technology_id in target_ids
+        for ev in raw.evaluations
     ]
 
-    # 2개 기술 누락 방지 fallback
-    done_ids = {e.technology_id for e in evaluations}
-    for t in req.technologies:
-        if t.technology_id not in done_ids:
-            evaluations.append(
-                TechnologyEvaluation(
-                    technology_id=t.technology_id,
-                    summary=f"{t.name} {perspective} 관점 요약",
-                )
-            )
-
+    if len(evaluations) != 2 or {e.technology_id for e in evaluations} != target_ids:
+        raise ValueError("관점 결과에는 요청한 두 기술이 정확히 한 번씩 필요합니다")
+    if any(not (e.positive_evidence or e.negative_evidence or e.neutral_evidence) for e in evaluations):
+        raise ValueError("근거 없는 빈 관점 결과를 성공으로 반환하지 않습니다")
+    for evaluation in evaluations:
+        claims = (evaluation.positive_evidence + evaluation.negative_evidence
+                  + evaluation.neutral_evidence + evaluation.trl_signals)
+        if any(claim.source_id not in sources_by_id for claim in claims):
+            raise ValueError("관점 결과가 참조 출처에 없는 source_id를 사용했습니다")
+    merged = merge_sources(state.get("sources", []), list(sources_by_id.values()))
+    old_ids = {s.source_id for s in state.get("sources", [])}
     return {
-        f"{perspective}_eval": PerspectiveResult(perspective=perspective, evaluations=evaluations[:2]),
-        "sources": list(sources_by_id.values()),
+        f"{perspective}_eval": PerspectiveResult(perspective=perspective, evaluations=evaluations),
+        "sources": [s for s in merged if s.source_id not in old_ids],
     }
+
 
 
 def _format_research(
