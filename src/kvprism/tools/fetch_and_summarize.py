@@ -40,14 +40,11 @@ def _extract_page_info(url: str, timeout: int = 10) -> tuple[str, str, str | Non
 
     soup = BeautifulSoup(html, "html.parser")
 
-    # 1. 제목 추출
     title = soup.title.string.strip() if soup.title and soup.title.string else "Untitled Source"
 
-    # 2. 기관/작성자 (도메인 기반)
     domain = urlparse(url).netloc.replace("www.", "").replace("m.", "")
     author_or_org = domain.split(".")[0].capitalize() if domain else "Web"
 
-    # 3. 발행일 메타 태그 추출 시도
     published_at: str | None = None
     meta_date = (
         soup.find("meta", property="article:published_time")
@@ -62,12 +59,10 @@ def _extract_page_info(url: str, timeout: int = 10) -> tuple[str, str, str | Non
         except Exception:
             published_at = None
 
-    # 4. 불필요한 태그 제거 후 본문 텍스트 추출
     for tag in soup(["script", "style", "nav", "footer", "header", "aside"]):
         tag.decompose()
 
     raw_text = " ".join(soup.stripped_strings)
-    # 연속 공백 정리
     cleaned_text = re.sub(r"\s+", " ", raw_text).strip()
 
     return title, author_or_org, published_at, cleaned_text
@@ -81,13 +76,11 @@ def fetch_and_summarize(url: str) -> tuple[str, Source]:
     """
     cache_path = _get_cache_path(url)
 
-    # 1. 로컬 캐시 조회 (Cache-Aside)
     if cache_path.exists():
         with open(cache_path, "r", encoding="utf-8") as f:
             data = json.load(f)
         return data["summary"], Source(**data["source"])
 
-    # 2. 본문 및 메타데이터 스크래핑
     try:
         title, author_or_org, published_at, full_text = _extract_page_info(url)
     except Exception as e:
@@ -112,7 +105,6 @@ def fetch_and_summarize(url: str) -> tuple[str, Source]:
         excerpt=excerpt,
     )
 
-    # 3. LLM 요약문 생성
     model_name = os.getenv("OPENAI_MODEL_NAME") or os.getenv("GENERATOR_MODEL") or "gpt-4o-mini"
     llm = ChatOpenAI(model=model_name, temperature=0)
 
@@ -132,7 +124,6 @@ def fetch_and_summarize(url: str) -> tuple[str, Source]:
     except Exception:
         summary = excerpt[:200]
 
-    # 4. 캐시 저장
     cache_data = {
         "summary": summary,
         "source": source.model_dump(),

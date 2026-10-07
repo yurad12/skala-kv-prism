@@ -77,7 +77,6 @@ def render_pdf(report_md: str, output_path: str | Path = "outputs/RAG-Output.pdf
     summary = body.split("\n# ", 1)[0]
     validate_summary(summary)
 
-    # 기존 제목과 메타데이터를 표지에 그대로 사용한다.
     cover = re.sub(r"\*\*(.+?)\*\*", r"\n## \1\n", cover)
     cover = cover.replace(" · ", "\n\n").strip()
     pdf.meta["title"] = "KV cache 최적화 기술 다관점 평가"

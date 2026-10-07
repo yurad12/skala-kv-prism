@@ -24,7 +24,6 @@ CACHE_DIR = Path("outputs/cache")
 CACHE_DIR.mkdir(parents=True, exist_ok=True)
 
 
-# 주요 테크 도메인 기관명 매핑 테이블
 KNOWN_DOMAINS: dict[str, str] = {
     "huggingface.co": "Hugging Face",
     "github.com": "GitHub",
@@ -98,7 +97,6 @@ def web_search(query: str, max_results: int = 5, topic:str="general") -> list[So
     """Tavily로 웹을 검색해 결과마다 Source를 만들어 돌려준다. 로컬 캐시를 우선 확인한다."""
     cache_path = _get_cache_path(query, max_results)
 
-    # 1. 로컬 캐시 조회
     if cache_path.exists():
         with open(cache_path, "r", encoding="utf-8") as f:
             cached_data = json.load(f)
@@ -109,7 +107,6 @@ def web_search(query: str, max_results: int = 5, topic:str="general") -> list[So
             )
         return [Source(**item) for item in cached_data]
 
-    # 2. Tavily 검색 실행
     api_key = os.getenv("TAVILY_API_KEY")
     if not api_key:
         raise RuntimeError("TAVILY_API_KEY가 없습니다")
@@ -126,7 +123,6 @@ def web_search(query: str, max_results: int = 5, topic:str="general") -> list[So
     except Exception as error:
         raise RuntimeError("웹 검색 호출에 실패했습니다") from error
 
-    # 3. Source 인스턴스 생성 및 캐시 저장
     sources: list[Source] = []
     cache_items: list[dict] = []
 
@@ -154,7 +150,6 @@ def web_search(query: str, max_results: int = 5, topic:str="general") -> list[So
             "excerpt": excerpt,
         }
 
-        # Pydantic 엄격 검증 통과 후 추가
         source_obj = Source(**data)
         sources.append(source_obj)
         cache_items.append(data)
