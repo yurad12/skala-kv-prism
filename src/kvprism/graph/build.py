@@ -19,9 +19,7 @@ from .state import GraphState, Perspective
 log = logging.getLogger(__name__)
 
 
-# ---------------------------------------------------------------------------
 # 노드 이름
-# ---------------------------------------------------------------------------
 
 
 RESEARCH = "research"
@@ -40,9 +38,7 @@ PERSPECTIVE_NODES: dict[Perspective, str] = {
 }
 
 
-# ---------------------------------------------------------------------------
 # 외부에서 주입받는 에이전트 노드
-# ---------------------------------------------------------------------------
 
 
 NodeFunction = Callable[[GraphState], dict]
@@ -84,9 +80,7 @@ def actual_graph_nodes() -> GraphNodes:
     )
 
 
-# ---------------------------------------------------------------------------
 # 재실행 제어
-# ---------------------------------------------------------------------------
 
 
 def route_after_judge(state: GraphState) -> str:
@@ -126,9 +120,7 @@ def route_retry_targets(state: GraphState) -> list[str]:
     return [PERSPECTIVE_NODES[target] for target in targets]
 
 
-# ---------------------------------------------------------------------------
 # 그래프 조립
-# ---------------------------------------------------------------------------
 
 
 def build_graph(nodes: GraphNodes | None = None) -> CompiledStateGraph:

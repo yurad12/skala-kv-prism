@@ -150,7 +150,6 @@ class SupervisorOutput(StrictModel):
         return self
 
 
-
 # 공통 노드 이름과 초기 상태
 WORKER_KEYS = {
     "research": "research", "market": "market_eval",

@@ -15,7 +15,6 @@ from ..rag.config import ROOT
 NodeFunction = Callable[[SupervisorState], dict]
 
 
-# 노드 등록과 입출력 계약
 @dataclass(frozen=True)
 class SupervisorNodes:
     supervisor: NodeFunction
